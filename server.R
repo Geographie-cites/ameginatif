@@ -36,11 +36,11 @@ shinyServer(function(input, output, session) {
     if(input$pottyp %in% c("dif", "oricomp", "descomp")){
       leafletProxy("mappot") %>%
         clearImages() %>% clearShapes() %>%
-        addRasterImage(x = SelecPotential(), colors = PotentialPalette(SelecPotential()), opacity = 0.4)
+        addRasterImage(x = SelecPotential(), project = FALSE, colors = PotentialPalette(SelecPotential()), opacity = 0.4)
     } else {
       leafletProxy("mappot") %>%
         clearImages() %>% clearShapes() %>%
-        addRasterImage(x = sqrt(SelecPotential()), colors = PotentialPalette(sqrt(SelecPotential())), opacity = 0.4) %>%
+        addRasterImage(x = sqrt(SelecPotential()), project = FALSE, colors = PotentialPalette(sqrt(SelecPotential())), opacity = 0.4) %>%
         addPolygons(data = DrawContour(), stroke = TRUE, fill = FALSE, color = "#a9a9a9", weight = 1, popup = as.character(round(DrawContour()$center^2)))
     }
   })
