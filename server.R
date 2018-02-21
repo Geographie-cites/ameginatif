@@ -37,11 +37,19 @@ shinyServer(function(input, output, session) {
       leafletProxy("mappot") %>%
         clearImages() %>% clearShapes() %>%
         addRasterImage(x = SelecPotential(), project = FALSE, colors = PotentialPalette(SelecPotential()), opacity = 0.4)
+    } else if (input$pottyp == "conn"){
+      leafletProxy("mappot") %>%
+        clearImages() %>% clearShapes() %>%
+        addPolygons(data = sfComConn, stroke = TRUE, weight = 1, color = "grey35", fill = TRUE, fillColor = "ghostwhite", fillOpacity = 0.3, label = sfComConn$TCLINE)
+    } else if (input$pottyp == "pol") {
+      leafletProxy("mappot") %>%
+        clearImages() %>% clearShapes() %>%
+        addPolygons(data = sfPol, stroke = TRUE, weight = 1, color = "grey35", fill = TRUE, fillColor = "ghostwhite", fillOpacity = 0.3, label = sfPol$pole2014)
     } else {
       leafletProxy("mappot") %>%
         clearImages() %>% clearShapes() %>%
         addRasterImage(x = sqrt(SelecPotential()), project = FALSE, colors = PotentialPalette(sqrt(SelecPotential())), opacity = 0.4) %>%
-        addPolygons(data = DrawContour(), stroke = TRUE, fill = FALSE, color = "#a9a9a9", weight = 1, popup = as.character(round(DrawContour()$center^2)))
+        addPolygons(data = DrawContour(), stroke = TRUE, fill = FALSE, color = "#a9a9a9", weight = 1, label = as.character(round(DrawContour()$center^2)))
     }
   })
   
@@ -80,7 +88,7 @@ shinyServer(function(input, output, session) {
     return(potCont)
   })
   
-
+  
   
 })
 

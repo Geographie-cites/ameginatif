@@ -24,6 +24,9 @@ library(dplyr)
 listCommuteAggregates <- readRDS("data/listaggregates.Rds")
 listOtherAggregates <- readRDS("data/listotherpurpose.Rds")
 listPotentials <- readRDS("data/listpotentials.Rds")
+sfComConn <- readRDS("data/communesconnect.Rds")
+sfPol <- readRDS("data/communespol.Rds")
+
 
 # vecMin <- sapply(listPotentials, function(x) cellStats(x = x, stat = min))
 # minMin <- min(vecMin[substr(names(vecMin), 1, 3) == "dif"])

@@ -99,7 +99,7 @@ shinyUI(fluidPage(
                column(3, wellPanel(
                  radioButtons("pottyp", 
                               label = "Indicateur", 
-                              choices = c("Desserte en réseau ferré" = "des",
+                              choices = c("Desserte en réseau ferré" = "conn",
                                           "Pôle d'emplois" = "pol",
                                           "Actifs selon scénario" = "ori", 
                                           "Emplois selon scénario" = "des", 
