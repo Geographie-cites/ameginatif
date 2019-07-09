@@ -1,94 +1,655 @@
-##############################
-# Shiny App: Postcar Explicatif
-# Server
-##############################
-
 shinyServer(function(input, output, session) {
   
-  # outputs ----
+  # Graphic Display  ----
+  # output$plot1 <- renderPlotly({
+  #   plot_ly(as.data.frame(commData), x = ~RelBal, y = ~AutoSuff)
+  # })
   
-  output$stock <- renderPlot({
-    req(input$equip, input$modetrans, input$reloc, input$excess)
-    grid.arrange(GetAggregates()$STOCKDIST, GetAggregates()$STOCKTPS, nrow = 1, ncol = 2)
+  #Indicators map Display  ----
+  output$mapIndic <- renderLeaflet({
+    
+    index <- Get_Index()
+    
+    leaflet(options = leafletOptions(zoomControl = FALSE, minZoom = 8, maxZoom = 13)) %>%
+      addMapPane("choropleth", zIndex = 410) %>%  # Level 1
+      addMapPane("réseau_routier", zIndex = 420) %>%  # Level 2
+      addMapPane("voie_ferré", zIndex = 430) %>%  # Level 3
+      addMapPane("station", zIndex = 440) %>%  # Level 4
+      addMapPane("cercles", zIndex = 450) %>%  # Level 5
+      addMapPane("label", zIndex = 460) %>%  # Level 6
+      addProviderTiles(provider = "CartoDB.PositronNoLabels",
+                       options = providerTileOptions(opacity = 0.5)) %>%
+      addProviderTiles(provider = "CartoDB.PositronOnlyLabels",
+                       options = pathOptions(pane = "label", opacity = 0.5)) %>%
+      addLayersControl(
+        position = "bottomright",
+        overlayGroups = c("Réseau routier principal", "Réseau ferré","Stations ferroviaires"),
+        options = layersControlOptions(collapsed = T)
+      ) %>%
+      fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)%>%
+      setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
+      hideGroup("Réseau routier principal") %>%
+      hideGroup("Réseau ferré") %>%
+      hideGroup("Stations ferroviaires") %>%
+      hideGroup(index$polygons)  %>%
+      hideGroup(index$layer)
   })
-  
-  output$ratio <- renderPlot({
-    req(input$equip, input$modetrans, input$reloc, input$excess)
-    grid.arrange(GetAggregates()$RATIODIST, GetAggregates()$RATIOTPS, nrow = 1, ncol = 2)
-  })
-  
-  output$intra <- renderPlot({
-    req(input$equip, input$modetrans, input$reloc, input$excess)
-    grid.arrange(GetAggregates()$INTRACOM, GetAggregates()$INTRADEP, nrow = 1, ncol = 2)
-  })
-  
-  
-  output$mappot <- renderLeaflet({
-    leaflet() %>% 
-      addProviderTiles(provider = "CartoDB.DarkMatter") %>% 
-      fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)
-  })
-  
-  
-  # observers ----
   
   observe({
-    if(input$pottyp %in% c("dif", "oricomp", "descomp")){
-      leafletProxy("mappot") %>%
-        clearImages() %>% clearShapes() %>%
-        addRasterImage(x = SelecPotential(), project = FALSE, colors = PotentialPalette(SelecPotential()), opacity = 0.4)
-    } else if (input$pottyp == "conn"){
-      leafletProxy("mappot") %>%
-        clearImages() %>% clearShapes() %>%
-        addPolygons(data = sfComConn, stroke = TRUE, weight = 1, color = "grey35", fill = TRUE, fillColor = "ghostwhite", fillOpacity = 0.3, label = sfComConn$TCLINE)
-    } else if (input$pottyp == "pol") {
-      leafletProxy("mappot") %>%
-        clearImages() %>% clearShapes() %>%
-        addPolygons(data = sfPol, stroke = TRUE, weight = 1, color = "grey35", fill = TRUE, fillColor = "ghostwhite", fillOpacity = 0.3, label = sfPol$pole2014)
-    } else {
-      leafletProxy("mappot") %>%
-        clearImages() %>% clearShapes() %>%
-        addRasterImage(x = sqrt(SelecPotential()), project = FALSE, colors = PotentialPalette(sqrt(SelecPotential())), opacity = 0.4) %>%
-        addPolygons(data = DrawContour(), stroke = TRUE, fill = FALSE, color = "#a9a9a9", weight = 1, label = as.character(round(DrawContour()$center^2)))
+    index <- Get_Index()
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    leafletProxy("mapIndic", data = index$commdata) %>%
+      clearShapes() %>%
+      addPolygons(data = st_transform(pol, crs = 4326), stroke = TRUE, weight = 0.5, opacity = 0.5, color = "grey", fill = TRUE,
+                  fillColor = "grey", fillOpacity = 0, group = "communes") %>%
+      addPolylines(data = st_transform(routier, crs = 4326),
+                   color = "grey",
+                   opacity = 0.6,
+                   weight = 1.3 ,
+                   stroke = TRUE,
+                   group = "Réseau routier principal",
+                   options = pathOptions(pane = "réseau_routier")) %>%
+      addPolylines(data = st_transform(vferre, crs = 4326),
+                   color = "grey",
+                   opacity = 1,
+                   weight = 1 ,
+                   stroke = TRUE,
+                   group = "Réseau ferré",
+                   dashArray = 2,
+                   options = pathOptions(pane = "voie_ferré")) %>%
+      addCircleMarkers(lng = station$longitude,
+                       lat = station$latitude,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "station")) %>%
+      addCircles(lng = index$commdata[["lon"]],
+                 lat = index$commdata[["lat"]],
+                 radius = (sqrt(index$data)/pi)*17,
+                 color = "#54278F",
+                 stroke = F,
+                 fillOpacity = 0.6,
+                 highlight = highlightOptions(
+                   weight = 5,
+                   color = "white",
+                   opacity = 1,
+                   fillOpacity = 0.8,
+                   bringToFront = F),
+                 label = sprintf(
+                   "<strong>%s</strong><br/> %.0f %s",
+                   toupper(index$commdata$nomcom),
+                   index$data,
+                   index$unit
+                 )%>% lapply(htmltools::HTML),
+                 labelOptions = labelOptions(
+                   style = list("font-weight" = "normal",
+                                padding = "3px 8px"),
+                   textsize = "15px",
+                   direction = "auto"),
+                 options = pathOptions(pane = "cercles"),
+                 group = "stock"
+      )%>%
+      addPolygons(
+        fillColor = ~colorBin(palette = index$color,
+                              bins = index$breaks,
+                              domain = index$data,
+                              na.color = "#dfdfe5")(index$data),
+        weight = 0.7,
+        opacity = 0.5,
+        color = "grey",
+        fillOpacity = 0.7,
+        highlight = highlightOptions(
+          weight = 2,
+          color = "white",
+          opacity = 0.7,
+          fillOpacity = 1,
+          bringToFront = TRUE),
+        label = sprintf(
+          "<strong>%s</strong><br/> %s %.2f %s",
+          toupper(index$commdata$nomcom),
+          index$nom,
+          index$data,
+          index$unit
+        )%>% lapply(htmltools::HTML),
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px",
+          direction = "auto"),
+        options = pathOptions(pane = "choropleth"),
+        group = "taux"
+      )
+    shinyjs::hideElement(id = 'loading-content')
+    shinyjs::hideElement(id = 'loading')
+  })
+  
+  observe({
+    index <- Get_Index()
+    proxy <- leafletProxy("mapIndic", data =index$commdata)
+    proxy %>% clearControls()
+    proxy %>%  hideGroup(index$polygons)
+    proxy %>%  hideGroup(index$layer)
+    if (input$radioIndex=="emploi" | input$radioIndex=="popact") {
+    }
+    else {
+      proxy %>% addLegend(pal = colorBin(palette = index$color,
+                                         bins = index$breaks,
+                                         domain = index$data,pretty = TRUE,
+                                         na.color = "#dfdfe5"),
+                          values = ~index$data, opacity = 0.7,
+                          title = NULL, position = "bottomright"
+      )
     }
   })
   
   
-  # functions ----
   
-  GetAggregates <- reactive({
-    keyCom <- paste(input$modetrans, input$reloc, input$excess, sep = "_")
-    keyOther <- paste(input$modetrans, input$equip, input$reloc, input$excess, sep = "_")
-    comConf <- listCommuteAggregates[[keyCom]]
-    comRef <- listCommuteAggregates[["ACT_ACT_ACT"]]
-    otherConf <- listOtherAggregates[[keyOther]]
-    otherRef <- listOtherAggregates[["ACT_ACT_ACT_ACT"]]
-    setOfPlots <- PlotAggrDist(comconf = comConf, otherconf = otherConf, comref = comRef, otherref = otherRef)
-    return(setOfPlots)
+  # Flow map Display ----
+  output$mapflu <- renderLeaflet({
+    lflFlow <- leaflet(options = leafletOptions(zoomControl = FALSE, minZoom = 8, maxZoom = 13)) %>%
+      addMapPane("communes", zIndex = 410) %>%  # Level 1
+      addMapPane("réseau_routier", zIndex = 420) %>%  # Level 2
+      addMapPane("voie_ferré", zIndex = 430) %>%  # Level 3
+      addMapPane("station", zIndex = 440) %>%  # Level 4
+      addMapPane("lignes", zIndex = 450) %>%  # Level 5
+      addMapPane("label", zIndex = 460) %>%  # Level 6
+      addProviderTiles(provider = "CartoDB.PositronNoLabels",
+                       options = providerTileOptions(opacity = 0.5)) %>%
+      addProviderTiles(provider = "CartoDB.PositronOnlyLabels",
+                       options = pathOptions(pane = "label", opacity = 0.5)) %>%
+      addLayersControl(
+        position = "bottomright",
+        overlayGroups = c("Réseau routier principal", "Réseau ferré", "Stations ferroviaires"),
+        options = layersControlOptions(collapsed = T)
+      ) %>%
+      fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)%>%
+      setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
+      hideGroup("Réseau routier principal") %>%
+      hideGroup("Réseau ferré") %>%
+      hideGroup("Stations ferroviaires")
+    
+    topDes <- isolate(GetTopLinks())
+    cityVal <- isolate(Get_CityValue())
+    lflFlow %>%
+      addPolylines(data = st_transform(routier, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau routier principal",
+                   options = pathOptions(pane = "réseau_routier")) %>%
+      addPolylines(data = st_transform(vferre, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
+                   options = pathOptions(pane = "voie_ferré")) %>%
+      addCircleMarkers(lng = station$longitude,
+                       lat = station$latitude,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "station")) %>%
+      addPolylines(data = topDes, color = "black", opacity = 0.8, weight = 1.2, stroke = TRUE, options = pathOptions(pane = "lignes"), group = "lignes") %>%
+      addPolygons(data = cityVal$SPCOM, fillColor = colorBin(palette = "Purples",
+                                                             bins = cityVal$BREAKS,
+                                                             domain = cityVal$SPCOM$DATA,
+                                                             na.color = "#dfdfe5")(cityVal$SPCOM$DATA)
+                  ,
+                  weight = 0.7,
+                  opacity = 0.5,
+                  color = "grey",
+                  fillOpacity = 0.7,
+                  highlight = highlightOptions(
+                    weight = 2,
+                    color = "white",
+                    opacity = 0.7,
+                    fillOpacity = 1,
+                    bringToFront = TRUE),
+                  label = sprintf(
+                    "<strong>%s</strong><br/> %.0f %s",
+                    toupper(cityVal$SPCOM$nomcom),
+                    cityVal$SPCOM$DATA,
+                    cityVal$INDEX
+                  )%>% lapply(htmltools::HTML),
+                  labelOptions = labelOptions(
+                    style = list("font-weight" = "normal", padding = "3px 8px"),
+                    textsize = "15px",
+                    direction = "auto"),
+                  options = pathOptions(pane = "réseau_routier")
+      ) %>%
+      addLegend(pal = colorBin(palette = "Purples",
+                               bins = cityVal$BREAKS,
+                               domain = cityVal$SPCOM$DATA,pretty = TRUE,
+                               na.color = "#dfdfe5"),
+                values = cityVal$SPCOM$DATA, opacity = 0.7,
+                title = NULL, position = "bottomright")
+    
   })
   
+  observe({
+    topDes <- GetTopLinks()
+    cityVal <- Get_CityValue()
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    leafletProxy("mapflu", data = cityVal$SPCOM) %>%
+      clearShapes() %>%
+      addPolylines(data = st_transform(routier, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau routier principal",
+                   options = pathOptions(pane = "réseau_routier")) %>%
+      addPolylines(data = st_transform(vferre, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
+                   options = pathOptions(pane = "voie_ferré")) %>%
+      addCircleMarkers(lng = station$longitude,
+                       lat = station$latitude,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "station")) %>%
+      addPolylines(data = topDes, color = "black", opacity = 0.8, weight = 1.2, stroke = TRUE, options = pathOptions(pane = "lignes"), group = "lignes") %>%
+      addPolygons(
+        fillColor = ~colorBin(palette = "Purples",
+                              bins = cityVal$BREAKS,
+                              domain = cityVal$SPCOM$DATA,
+                              na.color = "#dfdfe5")(cityVal$SPCOM$DATA),
+        weight = 0.7,
+        opacity = 0.5,
+        color = "grey",
+        fillOpacity = 0.7,
+        highlight = highlightOptions(
+          weight = 2,
+          color = "white",
+          opacity = 0.7,
+          fillOpacity = 1,
+          bringToFront = TRUE),
+        label = sprintf(
+          "<strong>%s</strong><br/> %.0f %s",
+          toupper(cityVal$SPCOM$nomcom),
+          cityVal$SPCOM$DATA,
+          cityVal$INDEX
+        )%>% lapply(htmltools::HTML),
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px",
+          direction = "auto"),
+        options = pathOptions(pane = "réseau_routier")
+      )
+    shinyjs::hideElement(id ='loading-content')
+    shinyjs::hideElement(id ='loading')
+  })
   
-  SelecPotential <- reactive({
-    req(input$pottyp, input$reloc, input$excess)
-    if(input$pottyp %in% c("ori", "des", "dif")){
-      keyRas <- paste(input$pottyp, input$reloc, input$excess, sep = "_")
-      resRaster <- listPotentials[[keyRas]]
-    } else {
-      keyRas <- paste(substr(input$pottyp, 1, 3), input$reloc, input$excess, sep = "_")
-      keyRasRef <- paste(substr(input$pottyp, 1, 3), "ACT_ACT", sep = "_")
-      oneRaster <- listPotentials[[keyRas]]
-      refRaster <- listPotentials[[keyRasRef]]
-      resRaster <- oneRaster - refRaster
+  observe({
+    cityVal <- Get_CityValue()
+    proxy <- leafletProxy("mapflu", data =cityVal$SPCOM)
+    proxy %>% clearControls()
+    proxy %>% addLegend(pal = colorBin(palette = "Purples",
+                                       bins = cityVal$BREAKS,
+                                       domain = cityVal$SPCOM$DATA,pretty = TRUE,
+                                       na.color = "#dfdfe5"),
+                        values = ~cityVal$SPCOM$DATA, opacity = 0.7,
+                        title = NULL, position = "bottomright"
+    )
+  })
+  
+  # Dominant flow map Display  ----
+  output$mapfluDom <- renderLeaflet({
+    
+    lflStructure <- leaflet(options = leafletOptions(zoomControl = FALSE, minZoom = 8, maxZoom = 13, incl.data=TRUE)) %>%
+      addMapPane("communes", zIndex = 410) %>%         # Level 1
+      addMapPane("réseau_routier", zIndex = 420) %>%   # Level 2
+      addMapPane("voie_ferré", zIndex = 430) %>%       # Level 3
+      addMapPane("station", zIndex = 440) %>%          # Level 4
+      addMapPane("flux", zIndex = 450) %>%             # Level 6
+      addMapPane("cercles", zIndex = 460) %>%          # Level 7
+      addMapPane("label", zIndex = 470) %>%            # Level 5
+      addProviderTiles(provider = "CartoDB.PositronNoLabels",
+                       options = providerTileOptions(opacity = 0.5)) %>%
+      addProviderTiles(provider = "CartoDB.PositronOnlyLabels",
+                       options = pathOptions(pane = "label", opacity = 0.5)) %>%
+      addLayersControl(
+        position = "bottomright",
+        overlayGroups = c("Communes", "Réseau routier principal", "Réseau ferré", "Stations ferroviaires"),
+        options = layersControlOptions(collapsed = T)
+      ) %>%
+      fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)%>%
+      setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
+      hideGroup("Réseau routier principal") %>%
+      hideGroup("Réseau ferré") %>%
+      hideGroup("Communes") %>%
+      hideGroup("Stations ferroviaires")
+    
+    structure <- isolate(Get_Structure())
+    lflStructure %>%
+      addPolygons(data = st_transform(pol, crs = 4326), stroke = TRUE, weight = 0.5, opacity = 0.5, color = "grey", fill = TRUE,
+                  fillColor = "grey", fillOpacity = 0, group = "Communes",
+                  options = pathOptions(pane = "communes")) %>%
+      addPolylines(data = st_transform(routier, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau routier principal",
+                   options = pathOptions(pane = "réseau_routier")) %>%
+      addPolylines(data = st_transform(vferre, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
+                   options = pathOptions(pane = "voie_ferré")) %>%
+      addCircleMarkers(lng = station$longitude,
+                       lat = station$latitude,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "station")) %>%
+      addPolylines(data = st_transform(structure$dataflu, crs = 4326), color = "#82909E", opacity = 0.2, weight = 1.5 ,
+                   stroke = TRUE) %>%
+      addCircles(lng = structure$cercle[["lon"]],
+                 lat = structure$cercle[["lat"]],
+                 color = colorNumeric(palette = c("#B35605","#F1A340","#828F9E"), domain = structure$cercle[["status"]])(structure$cercle[["status"]]),
+                 radius = structure$rayon,
+                 stroke = F,
+                 fillOpacity = 0.8,
+                 highlight = highlightOptions(
+                   weight = 5,
+                   color = "white",
+                   opacity = 1,
+                   fillOpacity = 1,
+                   bringToFront = F),
+                 label = sprintf(
+                   "<strong>%s</strong><br/> %s %.0f",
+                   structure$comm,
+                   structure$nom,
+                   structure$valCercle
+                 )%>% lapply(htmltools::HTML),
+                 labelOptions = labelOptions(
+                   style = list("font-weight" = "normal",
+                                padding = "3px 8px"),
+                   textsize = "15px",
+                   direction = "auto"),
+                 options = pathOptions(pane = "cercles")
+      )%>%
+      addLegendCustom(colors = c("#B35605","#F1A340","#97A7B8"), labels = c("Dominant", "Intermédiaire", "Dominé"), sizes = c(25, 20, 15))
+    
+    
+  })
+  
+  observe({
+    structure <- Get_Structure()
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    leafletProxy(mapId = "mapfluDom", data = c(structure$dataflu,structure$rayon,structure$col)) %>%
+      clearShapes() %>%
+      addPolygons(data = st_transform(pol, crs = 4326), stroke = TRUE, weight = 0.5, opacity = 0.5, color = "grey", fill = TRUE,
+                  fillColor = "grey", fillOpacity = 0, group = "Communes",
+                  options = pathOptions(pane = "communes")) %>%
+      addPolylines(data = st_transform(routier, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau routier principal",
+                   options = pathOptions(pane = "réseau_routier")) %>%
+      addPolylines(data = st_transform(vferre, crs = 4326), color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
+                   options = pathOptions(pane = "voie_ferré")) %>%
+      addCircleMarkers(lng = station$longitude,
+                       lat = station$latitude,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "station")) %>%
+      addPolylines(data = st_transform(structure$dataflu, crs = 4326), color = "#82909E", opacity = 0.2, weight = 1.5 ,
+                   stroke = TRUE)%>%
+      addCircles(lng = structure$cercle[["lon"]],
+                 lat = structure$cercle[["lat"]],
+                 radius = structure$rayon,
+                 color = ~colorNumeric(palette = c("#B35605","#F1A340","#828F9E"), domain = structure$cercle[["status"]])(structure$cercle[["status"]]),
+                 stroke = F,
+                 fillOpacity = 0.8,
+                 highlight = highlightOptions(
+                   weight = 5,
+                   color = "white",
+                   opacity = 1,
+                   fillOpacity = 1,
+                   bringToFront = F),
+                 label = sprintf(
+                   "<strong>%s</strong><br/> %s %.0f",
+                   structure$comm,
+                   structure$nom,
+                   structure$valCercle
+                 )%>% lapply(htmltools::HTML),
+                 labelOptions = labelOptions(
+                   style = list("font-weight" = "normal",
+                                padding = "3px 8px"),
+                   textsize = "15px",
+                   direction = "auto"),
+                 options = pathOptions(pane = "cercles")
+      )
+    shinyjs::hideElement(id ='loading-content')
+    shinyjs::hideElement(id ='loading')
+  })
+  
+  observe({
+    structure <- Get_Structure()
+    proxy <- leafletProxy("mapfluDom", data =c(structure$dataflu,structure$rayon,structure$col))
+    proxy %>% clearControls()
+    proxy %>% addLegendCustom(colors = c("#B35605","#F1A340","#97A7B8"), labels = c("Dominant", "Intermédiaire", "Dominé"), sizes = c(25, 20, 15))
+  })
+  
+  # description ----
+  observeEvent(input$index_descr, {
+    showModal(modalDialog(
+      includeHTML("coat/index_descr.html"),
+      easyClose = TRUE,
+      footer = NULL
+    ))
+  })
+  
+  observeEvent(input$flux_descr, {
+    showModal(modalDialog(
+      includeHTML("coat/flux_descr.html"),
+      easyClose = TRUE,
+      footer = NULL
+    ))
+  })
+  
+  observeEvent(input$pool_descr, {
+    showModal(modalDialog(
+      includeHTML("coat/pool_descr.html"),
+      easyClose = TRUE,
+      footer = NULL
+    ))
+  })
+  
+  observeEvent(input$fludom_descr, {
+    showModal(modalDialog(
+      includeHTML("coat/fludom_descr.html"),
+      easyClose = TRUE,
+      footer = NULL
+    ))
+  })
+  
+  showModal(modalDialog(
+    includeHTML("coat/welcome.html"),
+    easyClose = TRUE,
+    footer = NULL
+  ))
+  
+  
+  
+  # FUNCTIONS  ----
+  
+  selectScenar <- reactive({
+    print("selectscenar debut")
+    start_time <- Sys.time()
+    req(input$excess,input$reloc)
+    configuration <- paste(input$reloc,input$excess, sep = "_")
+    tabflows <- listTabflows[[configuration]]
+    tabflowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabflows,idori = "ORI",iddes = "DES")
+    poptab <- toyspace::pop_tab(tabflows = tabflows, tabdist = tabDist, idori = "ORI",iddes = "DES", idflow = "FLOW", iddist = "DIST")
+    poptabAgr <- toyspace::pop_tab(tabflows = tabflowsAgr, tabdist = tabDistAgr, idori = "ORIAGR",iddes = "DESAGR", idflow = "FLOW", iddist = "DIST")
+    print("select scenar fin")
+    end_time <- Sys.time()
+    print(end_time - start_time)
+    return(list(tabflows = tabflows, tabflowsAgr = tabflowsAgr, poptab = poptab, poptabAgr = poptabAgr))
+  })
+  
+  # Function Index ----
+  Get_Index <- reactive({
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    req(input$radioIndex)
+    index <- Index(mobi = input$radioIndex, commdata = Get_Filter_Index())
+    shinyjs::hideElement(id = 'loading-content')
+    shinyjs::hideElement(id = 'loading')
+    return(index)
+  })
+  
+  Get_Filter_Index <- reactive({
+    req(input$FiltreIndices)
+    if(input$FiltreIndices == "Tout"){
+      variable <- NULL
+      label <- NULL
+    } else if(input$FiltreIndices == "Agriculteurs exploitants"){
+      variable <- "CSP"
+      label <- 1
+    } else if(input$FiltreIndices == "Artisans, commerçants et chefs d'entreprise"){
+      variable <- "CSP"
+      label <- 2
+    } else if(input$FiltreIndices == "Cadres et professions intellectuelles supérieures"){
+      variable <- "CSP"
+      label <- 3
+    } else if(input$FiltreIndices == "Professions Intermédiaires"){
+      variable <- "CSP"
+      label <- 4
+    } else if(input$FiltreIndices == "Employés"){
+      variable <- "CSP"
+      label <- 5
+    } else if(input$FiltreIndices == "Ouvriers"){
+      variable <- "CSP"
+      label <- 6
+    } else if(input$FiltreIndices == "DOMICILE"){
+      variable <- "MODE"
+      label <- "DOMICILE"
+    } else if(input$FiltreIndices == "NM"){
+      variable <- "MODE"
+      label <- "NM"
+    } else if(input$FiltreIndices == "TC"){
+      variable <- "MODE"
+      label <- "TC"
+    } else if(input$FiltreIndices == "VP"){
+      variable <- "MODE"
+      label <- "VP"
     }
-    return(resRaster)
+    filterIndice <- Filter_indice(selectScenar()$tabflows, poptab = selectScenar()$poptab, tabdist = tabDist, idori = "ORI", iddes = "DES", idflow = "FLOW", iddist = "DIST", pol, idpol = "insee", variable = variable, label = label, centPol = centPol)
+    return(filterIndice)
   })
   
-  DrawContour <- reactive({
-    potCont <- PotentialContour(ras = sqrt(SelecPotential()))
-    return(potCont)
+  # Function Flux ----
+  
+  GetTopLinks <- reactive({
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    req(input$fluref, input$fluvar, input$flucom, input$fluthr)
+    topLinks <- GetLinks(tabnav = Get_Filter_Flux(), tabdist = tabDist, idori = "ORI", iddes = "DES", iddist = "DIST", ref = input$fluref, varsort = input$fluvar, oneunit = substring(input$flucom, 9), thres = input$fluthr)
+    shinyjs::hideElement(id = 'loading-content')
+    shinyjs::hideElement(id = 'loading')
+    return(topLinks)
   })
   
+  Get_CityValue <- reactive({
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    req(input$fluref, input$flucom, input$fluvar)
+    cityValue <- city_Value(tabflows = Get_Filter_Flux(), matDist = matDist, pol = pol,idpol = "insee", var = input$fluvar, ref = input$fluref, oneunit = substr(input$flucom, 1, 5))
+    shinyjs::hideElement(id = 'loading-content')
+    shinyjs::hideElement(id = 'loading')
+    return(cityValue)
+  })
   
+  Get_Filter_Flux <- reactive({
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    if(input$FiltreFlux == "Tout"){
+      variable <- NULL
+      label <- NULL
+    } else if(input$FiltreFlux == "Agriculteurs exploitants"){
+      variable <- "CSP"
+      label <- 1
+    } else if(input$FiltreFlux == "Artisans, commerçants et chefs d'entreprise"){
+      variable <- "CSP"
+      label <- 2
+    } else if(input$FiltreFlux == "Cadres et professions intellectuelles supérieures"){
+      variable <- "CSP"
+      label <- 3
+    } else if(input$FiltreFlux == "Professions Intermédiaires"){
+      variable <- "CSP"
+      label <- 4
+    } else if(input$FiltreFlux == "Employés"){
+      variable <- "CSP"
+      label <- 5
+    } else if(input$FiltreFlux == "Ouvriers"){
+      variable <- "CSP"
+      label <- 6
+    } else if(input$FiltreFlux == "DOMICILE"){
+      variable <- "MODE"
+      label <- "DOMICILE"
+    } else if(input$FiltreFlux == "NM"){
+      variable <- "MODE"
+      label <- "NM"
+    } else if(input$FiltreFlux == "TC"){
+      variable <- "MODE"
+      label <- "TC"
+    } else if(input$FiltreFlux == "VP"){
+      variable <- "MODE"
+      label <- "VP"
+    }
+    filterFlux <- Filter_flux(selectScenar()$tabflows, variable = variable, label = label)
+    return(filterFlux)
+  })
   
+  # Function Structure ----  
+  
+  Get_Structure <- reactive({
+    shinyjs::showElement(id = 'loading-content')
+    shinyjs::showElement(id = 'loading')
+    req(input$radioFlu)
+    structure <- Structure(Flu = input$radioFlu ,domFlowJob = Get_Filter_Structure()$domFlowJob ,domFlowPop = Get_Filter_Structure()$domFlowPop,domFlowJP = Get_Filter_Structure()$domFlowJP)
+    shinyjs::hideElement(id = 'loading-content')
+    shinyjs::hideElement(id = 'loading')
+    return(structure)
+  })
+  
+  Get_Filter_Structure <- reactive({
+    req(input$FiltreStructure)
+    if(input$FiltreStructure == "Tout"){
+      variable <- NULL
+      label <- NULL
+    } else if(input$FiltreStructure == "Agriculteurs exploitants"){
+      variable <- "CSP"
+      label <- 1
+    } else if(input$FiltreStructure == "Artisans, commerçants et chefs d'entreprise"){
+      variable <- "CSP"
+      label <- 2
+    } else if(input$FiltreStructure == "Cadres et professions intellectuelles supérieures"){
+      variable <- "CSP"
+      label <- 3
+    } else if(input$FiltreStructure == "Professions Intermédiaires"){
+      variable <- "CSP"
+      label <- 4
+    } else if(input$FiltreStructure == "Employés"){
+      variable <- "CSP"
+      label <- 5
+    } else if(input$FiltreStructure == "Ouvriers"){
+      variable <- "CSP"
+      label <- 6
+    } else if(input$FiltreStructure == "DOMICILE"){
+      variable <- "MODE"
+      label <- "DOMICILE"
+    } else if(input$FiltreStructure == "NM"){
+      variable <- "MODE"
+      label <- "NM"
+    } else if(input$FiltreStructure == "TC"){
+      variable <- "MODE"
+      label <- "TC"
+    } else if(input$FiltreStructure == "VP"){
+      variable <- "MODE"
+      label <- "VP"
+    }
+    filterStructure <- Filter_structure(selectScenar()$tabflows, poptab = selectScenar()$poptabAgr ,idflow = "FLOW", before, after, pol, idpol = "insee", namepol = "nomcom", nameAgr = "Paris", variable = variable, label = label)
+    return(filterStructure)
+  })
 })
-

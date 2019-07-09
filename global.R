@@ -1,148 +1,324 @@
-##############################
-# Shiny App: Postcar Explicatif
-# Global
-##############################
-
-
-# load packages ----
-
-library(shiny)
-library(shinythemes)
-library(leaflet)
+library(dplyr)
 library(ggplot2)
-library(gridExtra)
-library(sp)
-library(raster)
+library(shinythemes)
+library(shinyjs)
+library(shinyWidgets)
+library(leaflet)
+library(shinyBS)
+library(plotly)
 library(cartography)
+library(raster)
 library(SpatialPosition)
 library(reshape2)
-library(sf)
-library(dplyr)
-
-# load data ----
-
-listCommuteAggregates <- readRDS("data/listaggregates.Rds")
-listOtherAggregates <- readRDS("data/listotherpurpose.Rds")
-listPotentials <- readRDS("data/listpotentials.Rds")
-sfComConn <- readRDS("data/communesconnect.Rds")
-sfPol <- readRDS("data/communespol.Rds")
+library(flows)
 
 
-# vecMin <- sapply(listPotentials, function(x) cellStats(x = x, stat = min))
-# minMin <- min(vecMin[substr(names(vecMin), 1, 3) == "dif"])
-# vecMax <- sapply(listPotentials, function(x) cellStats(x = x, stat = max))
-# maxMax <- max(vecMax[substr(names(vecMax), 1, 3) == "dif"])
+# LOAD DATA----
+
+before <-  c(75101,75102,75103,75104,75105,75106,75107,75108,75109,75110,75111,75112,75113,75114,75115,75116,75117,75118,75119,75120)
+after <- 75056
+
+pol <- readRDS("data/pol.Rds")
 
 
-# compute and plot aggregates ----
+matDist <- readRDS(file = "data/matDist.Rds")
+matDistAgr <- readRDS(file = "data/matDistAGR.Rds")
 
-PlotAggrDist <- function(comconf, otherconf, comref, otherref){
-  
-  # time and distance aggregates
-  tabSum <- tibble(VAR = comconf$VAR[1:6], 
-                   CONF = comconf$VALUE[1:6] + otherconf,
-                   REF = comref$VALUE[1:6] + otherref)
-  tabSum$DIF <- tabSum$CONF - tabSum$REF
-  tabLong <- melt(data = tabSum, id.vars = "VAR", measure.vars = c("CONF", "REF"), variable.name = "CONFIG", value.name = "VALUE")
-  tabLong$CONFIG <- plyr::mapvalues(x = tabLong$CONFIG, from = c("CONF", "REF"), to = c("Scénario", "Actuel"))
-  tabLong$VARTYPE <- substr(tabLong$VAR, 1, 3)
-  
-  # stocks
-  stockDist <- ggplot(tabLong[tabLong$VARTYPE == "DIS", ]) +
-    geom_bar(aes(x = VAR, y = VALUE / 1000000, fill = CONFIG), stat= "identity", position = "dodge") +
-    scale_fill_manual(values = c("firebrick", "grey80")) +
-    scale_x_discrete(labels = c("Modes doux", "Trans.collectif", "Véh.particulier")) +
-    scale_y_continuous("Portée totale (millions de km)", breaks = seq(0, 300, 10)) +
-    coord_flip() + theme_darklinehc
-  
-  stockTps <- ggplot(tabLong[tabLong$VARTYPE == "TPS", ]) +
-    geom_bar(aes(x = VAR, y = VALUE / 1000000, fill = CONFIG), stat= "identity", position = "dodge") +
-    scale_fill_manual(values = c("firebrick", "grey80")) +
-    scale_x_discrete(labels = c("Modes doux", "Trans.collectif", "Véh.particulier")) +
-    scale_y_continuous("Temps de transport cumulé (millions d'heures)", breaks = seq(0, 30, 1)) +
-    coord_flip() + theme_darklinehc
-  
-  # ratio per individual
-  tabLong$VALUE <- tabLong$VALUE / 11415112
-  ratioDist <- ggplot(tabLong[tabLong$VARTYPE == "DIS", ]) +
-    geom_bar(aes(x = VAR, y = VALUE, fill = CONFIG), stat= "identity", position = "dodge") +
-    scale_fill_manual(values = c("firebrick", "grey80")) +
-    scale_x_discrete(labels = c("Modes doux", "Trans.collectif", "Véh.particulier")) +
-    scale_y_continuous("Portée par individu (km)", breaks = seq(0, 50, 1)) +
-    coord_flip() + theme_darklinehc
-  
-  ratioTps <- ggplot(tabLong[tabLong$VARTYPE == "TPS", ]) +
-    geom_bar(aes(x = VAR, y = 60 * VALUE, fill = CONFIG), stat= "identity", position = "dodge") +
-    scale_fill_manual(values = c("firebrick", "grey80")) +
-    scale_x_discrete(labels = c("Modes doux", "Trans.collectif", "Véh.particulier")) +
-    scale_y_continuous("Temps de transport par individu (mn)", breaks = seq(0, 150, 5)) +
-    coord_flip() + theme_darklinehc
-  
-  # intra share
-  tabIntra <- tibble(VAR = c("INTRACOMSCE", "INTRACOMREF", "INTRADEPSCE", "INTRADEPREF"),
-                     VALUE = c(sum(comconf$VALUE[7:9]) / sum(comconf$VALUE[1:3]),
-                               sum(comref$VALUE[7:9]) / sum(comref$VALUE[1:3]),
-                               sum(comconf$VALUE[13:15]) / sum(comconf$VALUE[1:3]),
-                               sum(comref$VALUE[13:15]) / sum(comref$VALUE[1:3])),
-                     TYPE = c("Intracommunal", "Intracommunal", "Intradépartemental", "Intradépartemental"),
-                     CONF = factor(x = c(1, 2, 1, 2),
-                                   levels = c(1, 2),
-                                   labels = c("Scénario", "Actuel")))
-  
-  intraCom <- ggplot(tabIntra[1:2, ]) +
-    geom_bar(aes(x = CONF, y = 100 * VALUE, fill = CONF), stat = "identity") +
-    scale_fill_manual(values = c("firebrick", "grey80")) +
-    scale_x_discrete() +
-    scale_y_continuous("Proportion de la distance intracommunale (%)") +
-    coord_flip() + theme_darklinehc
-  
-  intraDep <- ggplot(tabIntra[3:4, ]) +
-    geom_bar(aes(x = CONF, y = 100 * VALUE, fill = CONF), stat = "identity") +
-    scale_fill_manual(values = c("firebrick", "grey80")) +
-    scale_x_discrete() +
-    scale_y_continuous("Proportion de la distance intradépartementale (%)") +
-    coord_flip() + theme_darklinehc
-  
-  sixPlots <- list(STOCKDIST = stockDist, STOCKTPS = stockTps, 
-                   RATIODIST = ratioDist, RATIOTPS = ratioTps, 
-                   INTRACOM = intraCom, INTRADEP = intraDep)
-  return(sixPlots)
-}
+tabDist <- melt(matDist, value.name = "DIST", as.is = TRUE)
+colnames(tabDist) <- c("ORI","DES","DIST")
+
+tabDistAgr <- melt(matDistAgr, value.name = "DIST", as.is = TRUE)
+colnames(tabDistAgr) <- c("ORIAGR","DESAGR","DIST")
 
 
+#Tableau avec les origines, destination, mode de transport et flux de naveteurs entre toute les communes 
+listTabflows <- readRDS(file ="data/listTabflows2.Rds")
+# listTabflows2 <- readRDS(file ="data/listtabflows.Rds")
 
-PotentialPalette <- function(ras) {
-  valRas <- c(as.matrix(ras))
-  valRasMin <- min(valRas, na.rm = TRUE)
-  valRasMax <- max(valRas, na.rm = TRUE)
-  valRange <- c(valRasMin, valRasMax)
-  if(valRasMin >= 0 & valRasMax > 0){
-    palCol <- colorRampPalette(c("grey90", "firebrick"))(100)
-  } else if (valRasMax - valRasMin < 40) {
-    palCol <- "grey90"
-  } else {
-    seqVal <- seq(valRasMin, valRasMax, 20)
-    getZero <- findInterval(0, seqVal)
-    palBlue <- colorRampPalette(c("navyblue", "grey90"))(getZero)
-    palRed <- colorRampPalette(c("grey90", "firebrick"))(length(seqVal)-getZero)
-    palCol <- c(palBlue, palRed)
+# tabFlows <- readRDS(file = "data/tabflows.Rds")
+tabFlows <- readRDS(file = "data/tabflows2.Rds")
+
+tabFlowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabFlows,idori = "ORI",iddes = "DES")
+
+tabFlowsNoMode <- tabFlows %>%
+  group_by(ORI, DES) %>%
+  summarise(FLOW = sum(FLOW))
+
+#Tableau avec pour chaque commune le total des flux sortant, le total des flux entrant, 
+#et le total des flux intra
+#poptab <- toyspace::pop_tab(tabflows = tabFlows,tabdist = tabDist, idori = "ORI",iddes = "DES", idflow = "FLOW", iddist = "DIST")
+# poptabAgr <- toyspace::pop_tab(tabflows = tabFlowsAgr,idori = "ORIAGR",iddes = "DESAGR", idflow = "FLOW", iddist = "DIST")
+
+#couches tiers (voies ferré, réseau routier, gares.)
+vferre <- readRDS(file = "data/vferre.Rds")
+routier <- readRDS(file = "data/routier.Rds")
+station <- readRDS(file = "data/station.Rds")
+
+polAgr <- toyspace::pol_aggregate(before = before, after = after, pol = pol, idpol = "insee", namepol = "nomcom", nameAgr = "paris")
+
+#Coordonnées X Y des communes
+
+centPol <-readRDS("data/centPol.Rds")
+centPolAgr <-readRDS("data/centPolAgr.Rds")
+
+# commData <- toyspace::mob_indic(tabflows = tabFlows, tabdist = tabDist, idori = "ORI", iddes = "DES", idflow = "FLOW",iddist = "DIST", pol = pol, idpol = "insee")
+
+domFlowJob <- readRDS("data/domFlowJob.Rds")
+domFlowPop <- readRDS("data/domFlowPop.Rds")
+domFlowJP <- readRDS("data/domFlowJP.Rds")
+
+
+# FUNCTION GET ----
+
+# get index----
+
+Filter_indice <- function(tabflows, tabdist, idori, iddes, idflow, iddist, pol, idpol,variable, label, centPol, poptab){
+  print("filter indice debut")
+  start_time <- Sys.time()
+  shinyjs::showElement(id = 'loading')
+  if(is.null(variable) == TRUE | is.null(label) == TRUE){
+    tabflows <- tabflows
+  }else{
+    tabflows <- tabflows[tabflows[[variable]]==label,]
   }
-  return(palCol)
+  commdata <- toyspace::mob_indic(tabflows = tabflows, poptab = poptab, idori = idori, iddes = iddes, idflow = idflow, pol = pol, idpol = idpol)
+  commdata <- left_join(commdata, centPol[c("insee","lat","lon")],by = "insee")
+  shinyjs::hideElement(id = 'loading')
+  
+  print("filter indice fin")
+  end_time <- Sys.time()
+  print(end_time - start_time)
+  return(commdata)
 }
 
 
-# Draw contour polygons for potentials ----
-
-PotentialContour <- function(ras) {
-  potCont <- rasterToContourPoly(r = ras, nclass = 15)
-  potContGeo <- st_as_sf(spTransform(potCont, CRSobj = CRS("+init=epsg:4326")))
-  return(potContGeo)
+Index <- function(mobi,commdata){
+  if(mobi=="emploi"){
+    data <- commdata$TOTDES
+    nom <- ""
+    unit <- "emplois"
+    color <- "PuOr"
+    breaks <- replace(sort(append(0,getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks"))), 6, max(commdata$RelBal)+0.1)
+    layer <- "taux"
+    polygons <- ""
+  } else if(mobi=="popact"){
+    data <- commdata$TOTORI
+    nom <- ""
+    unit <- "actifs"
+    color <- "PuOr"
+    breaks <- replace(sort(append(0,getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks"))), 6, max(commdata$RelBal)+0.1)
+    layer <- "taux"
+    polygons <- ""}
+  else if(mobi=="soldeRel"){
+    data <- commdata$RelBal
+    nom <- "Solde relatif : "
+    unit <- ""
+    color <- "PuOr"
+    breaks <- unique(sort(round(replace(append(0,getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks")), length(getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks"))+1, max(commdata$RelBal, na.rm = TRUE)+0.1), digit = 2)))
+    layer <- "stock"
+    polygons <- "communes"}
+  else if(mobi=="Contention"){
+    data <- commdata$Contention
+    nom <- "Auto-Contention : "
+    unit <- "%"
+    color <- "Purples"
+    breaks <- unique(sort(replace(round(getBreaks(commdata$Contention,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$Contention,nclass = 6,method = "fisher-jenks"))+1, max(commdata$Contention, na.rm = TRUE)+0.1)))
+    layer <- "stock"
+    polygons <- "communes"}
+  else if(mobi=="Suffisance"){
+    data <- commdata$AutoSuff
+    nom <- "Auto-Suffisance : "
+    unit <- "%"
+    color <- "Purples"
+    breaks <- unique(sort(replace(round(getBreaks(commdata$AutoSuff,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$AutoSuff,nclass = 6,method = "fisher-jenks"))+1, max(commdata$AutoSuff, na.rm = TRUE)+0.1)))
+    layer <- "stock"
+    polygons <- "communes"}
+  else if(mobi=="meanDistOri"){
+    data <- commdata$DISTORI
+    nom <- "Distance moyenne à l'origine : "
+    unit <- "km"
+    color <- "Purples"
+    breaks <- unique(sort(replace(round(getBreaks(commdata$DISTORI,nclass = 6,method = "fisher-jenks"), digit = 2),length(getBreaks(commdata$DISTORI,nclass = 6,method = "fisher-jenks"))+1, max(commdata$DISTORI, na.rm = TRUE)+0.1)))
+    layer <- "stock"
+    polygons <- "communes"}
+  else if(mobi=="meanDistDes"){
+    data <- commdata$DISTDES
+    nom <- "Distance moyenne à destination : "
+    unit <- "km"
+    color <- "Purples"
+    breaks <- unique(sort(replace(round(getBreaks(commdata$DISTDES,nclass = 6,method = "fisher-jenks"), digit = 2),length(getBreaks(commdata$DISTDES,nclass = 6,method = "fisher-jenks"))+1, max(commdata$DISTDES, na.rm = TRUE)+0.1)))
+    layer <- "stock"
+    polygons <- "communes"}
+  else if(mobi=="perOri"){
+    data <- commdata$PerOri
+    nom <- "Part des flux à l'origine : "
+    unit <- "%"
+    color <- "Purples"
+    breaks <- unique(sort(replace(round(getBreaks(commdata$PerOri,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$PerOri,nclass = 6,method = "fisher-jenks"))+1, max(commdata$PerOri, na.rm = TRUE)+0.1)))
+    layer <- "stock"
+    polygons <- "communes"}
+  else if(mobi=="perDes"){
+    data <- commdata$PerDes
+    nom <- "Part des flux à la destination : "
+    unit <- "%"
+    color <- "Purples"
+    breaks <- unique(sort(replace(round(getBreaks(commdata$PerDes,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$PerDes,nclass = 6,method = "fisher-jenks"))+1, max(commData$PerDes, na.rm = TRUE)+0.1)))
+    layer <- "stock"
+    polygons <- "communes"}
+  return(list(data = data,nom = nom,unit = unit,color = color,breaks = breaks,layer = layer,polygons = polygons, commdata = commdata))
 }
 
 
-# ggplot dark theme ----
 
-# without lines
+
+
+# get flux ----
+
+Filter_flux <- function(tabflows, variable, label){
+  if(is.null(variable) == TRUE | is.null(label) == TRUE){
+    tabflows <- tabflows
+  }else{
+    tabflows <- tabflows[tabflows[[variable]]==label,]
+  }
+  shinyjs::hideElement(id = 'loading')
+  return(tabflows)
+}
+
+
+GetLinks <- function(tabnav, tabdist, idori, iddes, iddist, ref, varsort, oneunit, thres){
+  print("getlink debut")
+  start_time <- Sys.time()
+  tabnav$KEY <- paste(tabnav[[idori]], tabnav[[iddes]], sep = "_")
+  tabdist$KEY <- paste(tabdist[[idori]], tabdist[[iddes]], sep = "_")
+  tabnav <- left_join(tabnav, tabdist[, c(iddist, "KEY")], by = "KEY") 
+  tabnav$DISTTOT <- tabnav$DIST*tabnav$FLOW
+  
+  refLib <- paste0(ref, "LIB")
+  oriDes <- paste0(c("ORI", "DES"), "LIB")
+  invRef <- oriDes[oriDes != refLib]
+  tabSel <- tabnav %>% 
+    group_by(ORI, DES) %>% 
+    summarise(FLOW = sum(FLOW), DIST = first(DIST), DISTTOT = sum(DISTTOT), ORILIB = first(ORILIB), DESLIB = first(DESLIB)) %>% 
+    as.data.frame(stringsAsFactors = FALSE)
+  tabSel <- tabSel[tabSel[[refLib]] == oneunit, ]
+  tabSel <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
+  nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
+  if (dim(tabSel)[1] == 0) {
+    #get a "false" link with the same departure and arrival so it seems unexisting
+    spLinks <- getLinkLayer(x = pol, df = tabFlows[1:0, c("ORI", "DES")])
+  }else{
+    spLinks <- getLinkLayer(x = pol, df = tabSel[1:nbRows, c("ORI", "DES")])
+  }
+  topDes <- spLinks
+  print("getlink fin")
+  end_time <- Sys.time()
+  print(end_time - start_time)
+  return(topDes)
+}
+
+city_Value <- function(tabflows,matDist,pol,idpol,var, ref,oneunit){
+  print("cityval debut")
+  start_time <- Sys.time()
+  tabIndex <- expand.grid(ORI = pol[[idpol]],
+                          DES = pol[[idpol]],
+                          stringsAsFactors = FALSE)
+  tabIndex <- left_join(x = tabIndex, y = tabflows, by = c("ORI", "DES"))
+  if(ref == "ORI"){
+    matflow <- dcast(tabIndex, formula = DES ~ ORI, value.var = "FLOW", fun.aggregate = sum)
+    matflow <- as.matrix(matflow[, -1])
+    matflow[is.na(matflow)] <- 0
+    tabCityDist <- as.data.frame(matDist[oneunit,])
+    tabCityFlow <- as.data.frame(matflow[,oneunit])
+  }else{
+    matflow <- dcast(tabIndex, formula = ORI ~ DES, value.var = "FLOW", fun.aggregate = sum)
+    matflow <- as.matrix(matflow[, -1])
+    matflow[is.na(matflow)] <- 0
+    tabCityDist <- as.data.frame(matDist[,oneunit])
+    tabCityFlow <- as.data.frame(matflow[,oneunit])
+  }
+  colnames(tabCityFlow)<-"DATA"
+  colnames(tabCityDist)<-"DIST"
+  tabCityFlow$ID <- colnames(matflow)
+  tabCityDist$ID <- rownames(tabCityDist)
+  tabCityDist <- dplyr::left_join(tabCityFlow,tabCityDist, by = "ID")
+  tabCityDist$DATA <- tabCityDist$DATA * tabCityDist$DIST
+  if(var == "FLOW"){
+    tabCity <- tabCityFlow
+    index <- "actifs"
+  }else{
+    tabCity <- tabCityDist
+    index <- "km"
+  }
+  spcom <- dplyr::left_join(pol,tabCity, by = c("insee" ="ID"))
+  if(sum(tabCityFlow$DATA) == 0 |sum(tabCityDist$DATA) == 0){
+    breaks <- c(0,1)
+  }else{
+    breaks <- sort(unique(append(abs(round(replace(getBreaks(spcom$DATA, nclass = 6,method = "fisher-jenks"),length(getBreaks(spcom$DATA, nclass = 6,method = "fisher-jenks"))+1,max(spcom$DATA)+1))),0)))
+  }
+  print("cityval fin")
+  end_time <- Sys.time()
+  print(end_time - start_time)
+  return(list( SPCOM = spcom, INDEX = index, BREAKS = breaks))
+}
+
+# get structure----
+Structure <- function(Flu,domFlowJob,domFlowPop,domFlowJP){
+  if(Flu=="iEmploi"){
+    dataflu <- domFlowJob$FLOWS
+    rayon <- ((sqrt(domFlowJob$PTS$TOTDES)/pi)*20)+200
+    cercle <- domFlowJob$PTS
+    valCercle <- domFlowJob$PTS$TOTDES
+    nom <- "Emploi : "
+    comm <- toupper(domFlowJob$PTS$nomcom)}
+  else if(Flu=="iPopulation"){
+    dataflu <- domFlowPop$FLOWS
+    rayon <- ((sqrt(domFlowPop$PTS$TOTORI)/pi)*20)+200
+    cercle <- domFlowPop$PTS
+    valCercle <- domFlowPop$PTS$TOTORI
+    nom <- "Population : "
+    comm <- toupper(domFlowPop$PTS$nomcom)}
+  else if(Flu=="iEmpPop"){
+    dataflu <- domFlowJP$FLOWS
+    rayon <- ((sqrt(domFlowJP$PTS$TOTORIDES)/pi)*20)+200
+    cercle <- domFlowJP$PTS
+    valCercle <- domFlowJP$PTS$TOTORIDES
+    nom <- "Population et emplois : "
+    comm <- toupper(domFlowJP$PTS$nomcom)}
+  return(list(dataflu = dataflu, rayon = rayon, cercle = cercle, valCercle = valCercle, nom = nom, comm = comm, dataflu = dataflu))
+}
+
+Filter_structure <- function(tabflows, idflow, before, after, pol, idpol, namepol, nameAgr, variable, label, centPol, idCentPol, poptab){
+  shinyjs::showElement(id = 'loading')
+  print("structure debut")
+  start_time <- Sys.time()
+  if(is.null(variable) == TRUE | is.null(label) == TRUE){
+    tabflows <- tabflows
+  }else{
+    tabflows <- tabflows[tabflows[[variable]]==label,]
+  }
+  tabFlowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabflows,idori = "ORI",iddes = "DES")
+  domFlowJob <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = "FLOW", poptab,
+                                        weight = "destination", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
+  domFlowPop <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = idflow, poptab,
+                                        weight = "origin", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
+  domFlowJP <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = idflow, poptab,
+                                       weight = "sum", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
+  shinyjs::hideElement(id = 'loading')
+  
+  print("structure fin")
+  end_time <- Sys.time()
+  print(end_time - start_time)
+  return(list(domFlowJob = domFlowJob, domFlowPop = domFlowPop, domFlowJP = domFlowJP))
+}
+
+# Miscelaneous ----
+
+addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.8){
+  colorAdditions <- paste0(colors, "; width:", sizes, "px; height:", sizes, "px")
+  labelAdditions <- paste0("<div style='display: inline-block;height: ", sizes, "px;margin-bottom: 10px;line-height: ", sizes, "px;'>", labels, "</div>")
+  return(addLegend(map, colors = colorAdditions, labels = labelAdditions, opacity = opacity, position = "bottomright"))
+}
+
 theme_darkhc <- theme_bw() +
   theme(plot.background = element_rect(fill = "#272B30"),
         axis.line = element_line(color = "grey80"),
@@ -160,17 +336,16 @@ theme_darkhc <- theme_bw() +
 theme_darklinehc <- theme_bw() +
   theme(plot.background = element_rect(fill = "#272B30"),
         axis.line = element_line(color = "grey80"),
-        panel.grid.major = element_line(color = "grey80", size = 0.1),
+        panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
         panel.background = element_rect(fill = "#272B30"),
-        axis.title.x =  element_text(family = "sans-serif", size = 14, color = "grey80"),
-        axis.text.x = element_text(family = "sans-serif", size = 12, color = "grey80"),
-        axis.title.y = element_blank(),
-        axis.text.y = element_text(family = "sans-serif", size = 14, color = "grey80"),
+        axis.title = element_text(family = "sans-serif", color = "grey80"),
+        axis.text = element_text(family = "sans-serif", color = "grey80"),
         axis.ticks = element_blank(),
         legend.position = "bottom",
         legend.title = element_blank(),
         legend.key =  element_blank(),
         legend.text = element_text(family = "sans-serif", color = "grey80"),
         legend.background = element_rect(fill = "#272B30"))
+

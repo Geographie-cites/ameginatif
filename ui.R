@@ -1,116 +1,278 @@
-##############################
-# Shiny App: Postcar Explicatif
-# User interface
-##############################
-
-
-shinyUI(fluidPage(
-  theme = "darkGrey.css",
-  titlePanel("Améginat-IF : aménager en imaginant l'Île-de-France",
-             tags$head(tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
-                       tags$title("Ameginat-IF"))),
+shinyUI(bootstrapPage(
+  theme = shinytheme("superhero"),
+  useShinyjs(),
+  tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
   
-  tabsetPanel(
-    
-    # Guide ----
-    
-    tabPanel("Guide d'utilisation", 
-             fluidRow(
-               column(2),
-               column(7, includeMarkdown("README.md")))),
-    
-    # Réseau ----
-    
-    tabPanel("Scénario",
-             fluidRow(
-               column(2),
-               column(7,
-                      hr(),
-                      p(icon("delicious"), tags$strong("Relocaliser les populations et les activités")),
-                      radioButtons(inputId = "reloc", 
-                                   label = "", 
-                                   choices = c("Configuration actuelle" = "ACT", 
-                                               "Finger plan" = "FIN", 
-                                               "Transport-oriented development" = "TOD", 
-                                               "Polycentrisation" = "POL", 
-                                               "CBDsation" = "CBD"),
-                                   selected = "ACT",
-                                   inline = FALSE, width = "100%"),
-                      hr(),
-                      p(icon("building-o"), tags$strong("Relocaliser les équipements")),
-                      radioButtons(inputId = "equip", 
-                                   label = "", 
-                                   choices = c("Configuration actuelle" = "ACT", 
-                                               "Près des résidents" = "ORI",
-                                               "Près des emplois" = "DES", 
-                                               "Equilibre résidents-emplois" = "EQU"),
-                                   selected = "ACT",
-                                   inline = FALSE, width = "100%"),
-                      hr(),
-                      p(icon("compress"), tags$strong("Agir sur les mobilités résidentielle et professionnelle")),
-                      radioButtons(inputId = "excess", 
-                                   label = "", 
-                                   choices = c("Configuration actuelle" = "ACT", 
-                                               "Échange d'emploi" = "CS1", 
-                                               # "Bourse aux emplois selon NAE" = "NA5", 
-                                               # "Bourse aux emplois selon CSP & NAE" = "CSNA",
-                                               "Échange de logement" = "TYPL", 
-                                               # "Bourse aux logements selon type de ménage" = "TYPMR", 
-                                               # "Bourse aux logements selon type de logement & ménage" = "LGMR",
-                                               "Échange sans contrainte" = "GLO"),
-                                   selected = "ACT",
-                                   inline = FALSE, width = "100%"),
-                      hr(),
-                      p(icon("car"), tags$strong("Agir sur le mode de transport")),
-                      radioButtons(inputId = "modetrans", 
-                                   label = "", 
-                                   choices = c("Configuration actuelle" = "ACT", 
-                                               "Zéro voiture" = "ZVP", 
-                                               "Tout voiture" = "TVP",
-                                               "Zéro transport collectf" = "ZTC",
-                                               "Tout transport collectf" = "TTC",
-                                               "Zéro modes doux" = "ZNM",
-                                               "Tout modes doux" = "TNM"),
-                                   selected = "ACT",
-                                   inline = FALSE, width = "100%"),
-                      hr(),
-                      p(actionButton("computescenario", label = "Générer le scénario", icon("play-circle"))),
-                      hr())
-             )),
-    
-    tabPanel("Résultats en chiffres",
-             fluidRow(
-               column(12,
-                      tags$br(),
-                      tags$h4("Distance et temps moyens (jour ouvrable type)"),
-                      plotOutput("ratio", height = "500px"),
-                      tags$br(),
-                      tags$h4("Distance et temps cumulés (jour ouvrable type)"),
-                      plotOutput("stock", height = "500px"),
-                      tags$br(),
-                      tags$h4("Distance intracommunale et intradépartementale (jour ouvrable type)"),
-                      plotOutput("intra", height = "400px"))
-             )
-    ),
-    
-    
-    tabPanel("Résultats en cartes",
-             fluidRow(
-               column(3, wellPanel(
-                 radioButtons("pottyp", 
-                              label = "Indicateur", 
-                              choices = c("Desserte en réseau ferré" = "conn",
-                                          "Pôle d'emplois" = "pol",
-                                          "Actifs selon scénario" = "ori", 
-                                          "Emplois selon scénario" = "des", 
-                                          "Différentiel actifs-emplois" = "dif",
-                                          "Actifs : scénario vs. actuel" = "oricomp",
-                                          "Emplois : scénario vs. actuel" = "descomp"), 
-                              selected = "ori")
-               )),
-               column(9, leafletOutput("mappot", height = "800px"))
-             )
+  tags$style(HTML("
+                  body {
+                  font-family:'Helvetica';
+                  }
+                  #loading {
+                  position: relative;
+                  z-index : 1;
+                  }
+                  #Scénarii{
+                  margin: auto.;
+                  }
+                  #mapIndic {
+                  position: absolute;
+                  }
+                  #mapflu {
+                  position: absolute;
+                  }
+                  #mappot {
+                  position: absolute;
+                  }
+                  #mapfluDom {
+                  position: absolute;
+                  }
+                  .panel-title {
+                  text-align: center;
+                  }
+                  #tabPanel {
+                  max-height: 90%;
+                  overflow: auto;
+                  }
+                  .panel-group {
+                  margin-bottom: 0px;
+                  }
+                  .leaflet .legend i{
+                  border-radius: 50%;
+                  width: 10px;
+                  height: 10px;
+                  margin-bottom: 10px;
+                  }
+                  #tabPanel{
+                  font-weight: bold;
+                  }
+                  .panel-title{
+                  font-weight: bold;
+                  }
+                  .nav-tabs > li:hover {
+                  text-decoration: underline;
+                  }
+                  #Filtre{
+                  text-align: center;
+                  }
+                  .panel{
+                  box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+                  }
+                  #collapseExample{
+                  box-shadow: 0px 0px 0px rgba(0,0,0,0);
+                  }
+                  #loading-content {
+                  position: absolute;
+                  background: #999999;
+                  opacity: 0;
+                  z-index: 100;
+                  left: 0;
+                  right: 0;
+                  height: 100%;
+                  }
+                  ")),
+  
+  
+  # Loading wheel
+  absolutePanel(top = "50%", 
+                right = "50%",
+                class = "panel panel-default",
+                shinyjs::hidden(div(id = 'loading', addSpinner(div(), spin = "cube-grid", color = "#B35605")))
+  ),
+  
+  # Loading invisible panel
+  div(
+    id = "loading-content"
+  ),
+  
+  #Display maps through the panel selection
+  conditionalPanel(
+    condition = "input.tabs=='Indices'",
+    leafletOutput("mapIndic", width="100%", height = "100%") ,
+    absolutePanel(bottom = "2%",
+                  right = "25%",
+                  left = "25%",
+                  class = "panel panel-default",
+                  style = "padding : 10px;
+                  text-align: center",
+                  radioButtons("FiltreIndices",
+                               label = NULL,
+                               choices = list("Tout" = "Tout",
+                                              "Agriculteur" = "Agriculteurs exploitants",
+                                              "Artisan-commerçant" = "Artisans, commerçants et chefs d'entreprise",
+                                              "Prof. supérieure" = "Cadres et professions intellectuelles supérieures",
+                                              "Prof. intermédiaire" = "Professions Intermédiaires",
+                                              "Employé" = "Employés",
+                                              "Ouvrier" = "Ouvriers",
+                                              "Automobiliste" = "VP",
+                                              "Transporté collectivement" = "TC",
+                                              "Travaille à domicile" = "DOMICILE",
+                                              "Usagers de mode doux" = "NM"),
+                               selected = "Tout",
+                               inline = T)
     )
+  ),
+  conditionalPanel(
+    condition = "input.tabs=='Flux'",
+    leafletOutput("mapflu", width="100%", height = "100%"),
+    absolutePanel(bottom = "2%",
+                  right = "25%",
+                  left = "25%",
+                  class = "panel panel-default",
+                  style = "padding : 10px;
+                  text-align: center",
+                  radioButtons("FiltreFlux",
+                               label = NULL,
+                               choices = list("Tout" = "Tout",
+                                              "Agriculteur" = "Agriculteurs exploitants",
+                                              "Artisan-commerçant" = "Artisans, commerçants et chefs d'entreprise",
+                                              "Prof. supérieure" = "Cadres et professions intellectuelles supérieures",
+                                              "Prof. intermédiaire" = "Professions Intermédiaires",
+                                              "Employé" = "Employés",
+                                              "Ouvrier" = "Ouvriers",
+                                              "Automobiliste" = "VP",
+                                              "Transporté collectivement" = "TC",
+                                              "Travaille à domicile" = "DOMICILE",
+                                              "Usagers de mode doux" = "NM"),
+                               selected = "Tout",
+                               inline = T)
+    )
+  ),
+  conditionalPanel(
+    condition = "input.tabs=='Structure'",
+    leafletOutput("mapfluDom", width="100%", height = "100%"),
+    absolutePanel(bottom = "2%",
+                  right = "25%",
+                  left = "25%",
+                  class = "panel panel-default",
+                  style = "padding : 10px;
+                  text-align: center",
+                  radioButtons("FiltreStructure",
+                               label = NULL,
+                               choices = list("Tout" = "Tout",
+                                              "Agriculteur" = "Agriculteurs exploitants",
+                                              "Artisan-commerçant" = "Artisans, commerçants et chefs d'entreprise",
+                                              "Prof. supérieure" = "Cadres et professions intellectuelles supérieures",
+                                              "Prof. intermédiaire" = "Professions Intermédiaires",
+                                              "Employé" = "Employés",
+                                              "Ouvrier" = "Ouvriers",
+                                              "Automobiliste" = "VP",
+                                              "Transporté collectivement" = "TC",
+                                              "Travaille à domicile" = "DOMICILE",
+                                              "Usagers de mode doux" = "NM"),
+                               selected = "Tout",
+                               inline = T)
+    )
+  ),
+  
+  #Scenarios panel
+  absolutePanel(id ="Scénarii",
+                top = "2%", 
+                right = "25%",
+                left = "25%",
+                class = "panel panel-default",
+                style = "padding : 10px",
+                bsCollapse(id = "collapseExample", open = "Panel 2",
+                           bsCollapsePanel("Scénarios",
+                                           radioButtons(inputId = "reloc",
+                                                        label = "Relocaliser les populations et les activités",
+                                                        choices = c("Configuration actuelle" = "ACT",
+                                                                    "Finger plan" = "FIN",
+                                                                    "Transport-oriented development" = "TOD",
+                                                                    "Polycentrisation" = "POL",
+                                                                    "CBDsation" = "CBD"),
+                                                        selected = "ACT",
+                                                        inline = T, width = "100%"),
+                                           radioButtons(inputId = "equip",
+                                                        label = "Relocaliser les équipements",
+                                                        choices = c("Configuration actuelle" = "ACT",
+                                                                    "Près des résidents" = "ORI",
+                                                                    "Près des emplois" = "DES",
+                                                                    "Equilibre résidents-emplois" = "EQU"),
+                                                        selected = "ACT",
+                                                        inline = T, width = "100%"),
+                                           radioButtons(inputId = "excess",
+                                                        label = "Agir sur les mobilités résidentielle et professionnelle",
+                                                        choices = c("Configuration actuelle" = "ACT",
+                                                                    "Échange d'emploi" = "EMP",
+                                                                    "Échange de logement" = "RES"),
+                                                        selected = "ACT",
+                                                        inline = T, width = "100%"),
+                                           radioButtons(inputId = "modetrans",
+                                                        label = "Agir sur le mode de transport",
+                                                        choices = c("Configuration actuelle" = "ACT",
+                                                                    "Zéro voiture" = "ZVP",
+                                                                    "Tout voiture" = "TVP",
+                                                                    "Zéro transport collectf" = "ZTC",
+                                                                    "Tout transport collectf" = "TTC",
+                                                                    "Zéro modes doux" = "ZNM",
+                                                                    "Tout modes doux" = "TNM"),
+                                                        selected = "ACT",
+                                                        inline = T, width = "100%")
+                                           
+                           )
+                )
+  ),
+  #indicators panel
+  absolutePanel( id = "tabPanel",
+                 class = "panel panel-default",
+                 style = "padding : 10px",
+                 top = "2%", 
+                 left = "2%",
+                 right = "78%",
+                 tabsetPanel(id = "tabs", 
+                             
+                             ####### Panneau Indice ##### 
+                             tabPanel("Indices", 
+                                      radioButtons("radioIndex", label = NULL,
+                                                   choices = list("Emploi" = "emploi",
+                                                                  "Population active" = "popact",
+                                                                  "Solde Relatif" = "soldeRel",
+                                                                  "Auto-Contention" = "Contention",
+                                                                  "Auto-Suffisance" = "Suffisance",
+                                                                  "Distance moyenne à l'origine" = "meanDistOri",
+                                                                  "Distance moyenne à destination" = "meanDistDes",
+                                                                  "Part des flux à l'origine" = "perOri",
+                                                                  "Part des flux à la destination" = "perDes"
+                                                   )),
+                                      actionButton("index_descr", "Description")
+                             ),
+                             ####### Panneau Micro Flux     #####
+                             tabPanel("Flux",
+                                      selectInput("flucom", 
+                                                  label = "Choisir une commune",
+                                                  choices = sort(centPol$LIBGEO),
+                                                  selected = ""),
+                                      radioButtons("fluref", label = "Origine ou destination", choices = c("Origine" = "ORI", "Destination" = "DES"), selected = "ORI"),
+                                      radioButtons("fluvar", label = "Quantité", choices = c("Nombre d'individus" = "FLOW", "Cumul de distance" = "DISTTOT"), selected = "FLOW"),
+                                      sliderInput("fluthr", label = "Top", min = 2, max = 100, step = 1, value = 3),
+                                      actionButton("flux_descr", "Description")
+                             ),
+                             ####### Panneau FluxDom  #####
+                             tabPanel("Structure",
+                                      radioButtons("radioFlu", label = NULL,
+                                                   choices = list("Emploi" = "iEmploi",
+                                                                  "Population" = "iPopulation",
+                                                                  "Population + Emploi" = "iEmpPop"
+                                                   )),
+                                      actionButton("fludom_descr", "Description")
+                             )
+                 )
   )
-)
-)
+  
+  
+  
+  
+  
+  #Graphic panel button display
+  # absolutePanel( class = "panel panel-default",
+  #                style = "padding : 10px",
+  #                top = "2%",
+  #                left = "78%",
+  #                right = "2%",
+  #                bsCollapse(id = "collapseExample", open = "Panel 2",
+  #                           bsCollapsePanel("Graphiques",
+  #                                           plotlyOutput("plot1")
+  #                                           )
+  #                           )
+  # )
+  ))
