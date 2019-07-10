@@ -8,7 +8,6 @@ library(shinyBS)
 library(plotly)
 library(cartography)
 library(raster)
-library(SpatialPosition)
 library(reshape2)
 library(flows)
 
