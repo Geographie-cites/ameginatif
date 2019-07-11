@@ -19,8 +19,6 @@ shinyServer(function(input, output, session) {
       addMapPane("label", zIndex = 460) %>%  # Level 6
       addProviderTiles(provider = "CartoDB.PositronNoLabels",
                        options = providerTileOptions(opacity = 0.5)) %>%
-      addProviderTiles(provider = "CartoDB.PositronOnlyLabels",
-                       options = pathOptions(pane = "label", opacity = 0.5)) %>%
       addLayersControl(
         position = "bottomright",
         overlayGroups = c("Réseau routier principal", "Réseau ferré","Stations ferroviaires"),
@@ -113,7 +111,7 @@ shinyServer(function(input, output, session) {
           index$nom,
           index$data,
           index$unit
-        )%>% lapply(htmltools::HTML),
+        ) %>% lapply(htmltools::HTML),
         labelOptions = labelOptions(
           style = list("font-weight" = "normal", padding = "3px 8px"),
           textsize = "15px",
@@ -156,9 +154,7 @@ shinyServer(function(input, output, session) {
       addMapPane("lignes", zIndex = 450) %>%  # Level 5
       addMapPane("label", zIndex = 460) %>%  # Level 6
       addProviderTiles(provider = "CartoDB.PositronNoLabels",
-                       options = providerTileOptions(opacity = 0.5)) %>%
-      addProviderTiles(provider = "CartoDB.PositronOnlyLabels",
-                       options = pathOptions(pane = "label", opacity = 0.5)) %>%
+                       options = providerTileOptions(opacity = 0.5)) %>% 
       addLayersControl(
         position = "bottomright",
         overlayGroups = c("Réseau routier principal", "Réseau ferré", "Stations ferroviaires"),
@@ -303,8 +299,6 @@ shinyServer(function(input, output, session) {
       addMapPane("label", zIndex = 470) %>%            # Level 5
       addProviderTiles(provider = "CartoDB.PositronNoLabels",
                        options = providerTileOptions(opacity = 0.5)) %>%
-      addProviderTiles(provider = "CartoDB.PositronOnlyLabels",
-                       options = pathOptions(pane = "label", opacity = 0.5)) %>%
       addLayersControl(
         position = "bottomright",
         overlayGroups = c("Communes", "Réseau routier principal", "Réseau ferré", "Stations ferroviaires"),

@@ -348,3 +348,41 @@ theme_darklinehc <- theme_bw() +
         legend.text = element_text(family = "sans-serif", color = "grey80"),
         legend.background = element_rect(fill = "#272B30"))
 
+
+
+## Toyspace functions ----
+
+mob_indic <- function(tabflows, idori, iddes, idflow, pol, idpol, poptab){
+  
+  # auto-contention
+  poptab$Contention <- (poptab$TOTINTRA / (poptab$TOTORI + poptab$TOTINTRA))*100
+  poptab$Contention <- ifelse(is.na(poptab$Contention), 0, poptab$Contention)
+  
+  # auto-sufficiency
+  poptab$AutoSuff <- (poptab$TOTINTRA / (poptab$TOTDES + poptab$TOTINTRA))*100
+  poptab$AutoSuff <- ifelse(is.na(poptab$AutoSuff), 0, poptab$AutoSuff)
+  
+  # Relative Balance
+  poptab$RelBal <- (poptab$TOTDES - poptab$TOTORI) / (poptab$TOTORI + poptab$TOTDES)
+  poptab$RelBal <- ifelse(is.na(poptab$RelBal), 0, poptab$RelBal)
+  
+  # Difference
+  poptab$Difference <- poptab$TOTDES - poptab$TOTORI
+  poptab$Difference <- ifelse(is.na(poptab$Difference), 0, poptab$Difference)
+  
+  # Percentage of total flows at origin
+  poptab$PerOri <- (poptab$TOTORI*100) / sum(poptab$TOTORI)
+  poptab$PerOri <- ifelse(is.na(poptab$PerOri), 0, poptab$PerOri)
+  
+  # Percentage of total flows at destination
+  poptab$PerDes <- (poptab$TOTDES*100) / sum(poptab$TOTDES)
+  poptab$PerDes <- ifelse(is.na(poptab$PerDes), 0, poptab$PerDes)
+  
+  # Percentage of total internal flows
+  poptab$PerIntra <- (poptab$TOTINTRA*100) / sum(poptab$TOTINTRA)
+  poptab$PerIntra <- ifelse(is.na(poptab$PerIntra), 0, poptab$PerIntra)
+  
+  polTabFull <- left_join(pol, poptab, by = c(idpol = "CODGEO"))
+  
+  return(polTabFull)
+}
