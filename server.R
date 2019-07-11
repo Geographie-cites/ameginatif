@@ -5,6 +5,47 @@ shinyServer(function(input, output, session) {
   #   plot_ly(as.data.frame(commData), x = ~RelBal, y = ~AutoSuff)
   # })
   
+  
+  # get data ----
+  
+  select_data <- reactive({
+    req(input$reloc, input$excess, input$modetrans, input$filterpop)
+    spaceConfig <- paste(input$reloc,input$excess, sep = "_")
+    tempFlows <- listTabflows[[spaceConfig]] 
+    if(input$filterpop == "TOU"){
+      tempFlows <- tempFlows
+    } else if (input$filterpop == "AGR") {
+      tempFlows <- tempFlows %>% filter(CSP == 1)
+    } else if (input$filterpop == "ART") {
+      tempFlows <- tempFlows %>% filter(CSP == 2)
+    } else if (input$filterpop == "CAD") {
+      tempFlows <- tempFlows %>% filter(CSP == 3)
+    } else if (input$filterpop == "INT") {
+      tempFlows <- tempFlows %>% filter(CSP == 4)
+    } else if (input$filterpop == "EMP") {
+      tempFlows <- tempFlows %>% filter(CSP == 5)
+    } else if (input$filterpop == "OUV") {
+      tempFlows <- tempFlows %>% filter(CSP == 6)
+    } else if (input$filterpop == "VP") {
+      tempFlows <- tempFlows %>% filter(MODE == "VP")
+    } else if (input$filterpop == "TC") {
+      tempFlows <- tempFlows %>% filter(MODE == "TC")
+    } else if (input$filterpop == "DO") {
+      tempFlows <- tempFlows %>% filter(MODE == "DOMICILE")
+    } else if (input$filterpop == "NM") {
+      tempFlows <- tempFlows %>% filter(MODE == "NM")
+    }
+    
+    
+    tempflowsAgr <- arr_aggregate(before = paste0("751", ifelse(1:20 < 10, paste0("0", 1:20), 1:20)), after = "75056", tabflows = tempflows, idori = "ORI", iddes = "DES")
+    infoCom <- spatunit_indices(tabflows = tempflows, idori = "ORI", iddes = "DES", idflow = "FLOW")
+    poptabAgr <- toyspace::pop_tab(tabflows = tabflowsAgr, tabdist = tabDistAgr, idori = "ORIAGR",iddes = "DESAGR", idflow = "FLOW", iddist = "DIST")
+    print("select scenar fin")
+    end_time <- Sys.time()
+    print(end_time - start_time)
+    return(list(tabflows = tabflows, tabflowsAgr = tabflowsAgr, poptab = poptab, poptabAgr = poptabAgr))
+    
+  })
   #Indicators map Display  ----
   output$mapIndic <- renderLeaflet({
     
@@ -88,8 +129,7 @@ shinyServer(function(input, output, session) {
                    textsize = "15px",
                    direction = "auto"),
                  options = pathOptions(pane = "cercles"),
-                 group = "stock"
-      )%>%
+                 group = "stock") %>%
       addPolygons(
         fillColor = ~colorBin(palette = index$color,
                               bins = index$breaks,

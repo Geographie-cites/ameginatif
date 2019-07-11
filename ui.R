@@ -85,87 +85,31 @@ shinyUI(bootstrapPage(
   ),
   
   #Display maps through the panel selection
-  conditionalPanel(
-    condition = "input.tabs=='Indices'",
-    leafletOutput("mapIndic", width="100%", height = "100%") ,
-    absolutePanel(bottom = "2%",
-                  right = "25%",
-                  left = "25%",
-                  class = "panel panel-default",
-                  style = "padding : 10px;
+  absolutePanel(bottom = "2%",
+                right = "25%",
+                left = "25%",
+                class = "panel panel-default",
+                style = "padding : 10px;
                   text-align: center",
-                  radioButtons("FiltreIndices",
-                               label = NULL,
-                               choices = list("Tout" = "Tout",
-                                              "Agriculteur" = "Agriculteurs exploitants",
-                                              "Artisan-commerçant" = "Artisans, commerçants et chefs d'entreprise",
-                                              "Prof. supérieure" = "Cadres et professions intellectuelles supérieures",
-                                              "Prof. intermédiaire" = "Professions Intermédiaires",
-                                              "Employé" = "Employés",
-                                              "Ouvrier" = "Ouvriers",
-                                              "Automobiliste" = "VP",
-                                              "Transporté collectivement" = "TC",
-                                              "Travaille à domicile" = "DOMICILE",
-                                              "Usagers de mode doux" = "NM"),
-                               selected = "Tout",
-                               inline = T)
-    )
-  ),
-  conditionalPanel(
-    condition = "input.tabs=='Flux'",
-    leafletOutput("mapflu", width="100%", height = "100%"),
-    absolutePanel(bottom = "2%",
-                  right = "25%",
-                  left = "25%",
-                  class = "panel panel-default",
-                  style = "padding : 10px;
-                  text-align: center",
-                  radioButtons("FiltreFlux",
-                               label = NULL,
-                               choices = list("Tout" = "Tout",
-                                              "Agriculteur" = "Agriculteurs exploitants",
-                                              "Artisan-commerçant" = "Artisans, commerçants et chefs d'entreprise",
-                                              "Prof. supérieure" = "Cadres et professions intellectuelles supérieures",
-                                              "Prof. intermédiaire" = "Professions Intermédiaires",
-                                              "Employé" = "Employés",
-                                              "Ouvrier" = "Ouvriers",
-                                              "Automobiliste" = "VP",
-                                              "Transporté collectivement" = "TC",
-                                              "Travaille à domicile" = "DOMICILE",
-                                              "Usagers de mode doux" = "NM"),
-                               selected = "Tout",
-                               inline = T)
-    )
-  ),
-  conditionalPanel(
-    condition = "input.tabs=='Structure'",
-    leafletOutput("mapfluDom", width="100%", height = "100%"),
-    absolutePanel(bottom = "2%",
-                  right = "25%",
-                  left = "25%",
-                  class = "panel panel-default",
-                  style = "padding : 10px;
-                  text-align: center",
-                  radioButtons("FiltreStructure",
-                               label = NULL,
-                               choices = list("Tout" = "Tout",
-                                              "Agriculteur" = "Agriculteurs exploitants",
-                                              "Artisan-commerçant" = "Artisans, commerçants et chefs d'entreprise",
-                                              "Prof. supérieure" = "Cadres et professions intellectuelles supérieures",
-                                              "Prof. intermédiaire" = "Professions Intermédiaires",
-                                              "Employé" = "Employés",
-                                              "Ouvrier" = "Ouvriers",
-                                              "Automobiliste" = "VP",
-                                              "Transporté collectivement" = "TC",
-                                              "Travaille à domicile" = "DOMICILE",
-                                              "Usagers de mode doux" = "NM"),
-                               selected = "Tout",
-                               inline = T)
-    )
+                radioButtons(inputId = "filterpop",
+                             label = NULL,
+                             choices = list("Tout" = "TOU",
+                                            "Agriculteur" = "AGR",
+                                            "Artisan-commerçant" = "ART",
+                                            "Prof. supérieure" = "CAD",
+                                            "Prof. intermédiaire" = "INT",
+                                            "Employé" = "EMP",
+                                            "Ouvrier" = "OUV",
+                                            "Automobiliste" = "VP",
+                                            "Transporté collectivement" = "TC",
+                                            "Travaille à domicile" = "DO",
+                                            "Usagers de mode doux" = "NM"),
+                             selected = "TOU",
+                             inline = T)
   ),
   
   #Scenarios panel
-  absolutePanel(id ="Scénarii",
+  absolutePanel(id ="Scenarii",
                 top = "2%", 
                 right = "25%",
                 left = "25%",
@@ -250,21 +194,4 @@ shinyUI(bootstrapPage(
                              )
                  )
   )
-  
-  
-  
-  
-  
-  #Graphic panel button display
-  # absolutePanel( class = "panel panel-default",
-  #                style = "padding : 10px",
-  #                top = "2%",
-  #                left = "78%",
-  #                right = "2%",
-  #                bsCollapse(id = "collapseExample", open = "Panel 2",
-  #                           bsCollapsePanel("Graphiques",
-  #                                           plotlyOutput("plot1")
-  #                                           )
-  #                           )
-  # )
-  ))
+))

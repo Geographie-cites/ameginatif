@@ -1,24 +1,24 @@
-library(dplyr)
-library(ggplot2)
+###########################################
+##### Ameginatif - global functions #######
+###########################################
+
+# load packages ----
+
 library(shinythemes)
 library(shinyjs)
 library(shinyWidgets)
-library(leaflet)
 library(shinyBS)
-library(plotly)
 library(cartography)
 library(raster)
-library(reshape2)
+library(leaflet)
 library(flows)
+library(reshape2)
+library(dplyr)
 
 
-# LOAD DATA----
-
-before <-  c(75101,75102,75103,75104,75105,75106,75107,75108,75109,75110,75111,75112,75113,75114,75115,75116,75117,75118,75119,75120)
-after <- 75056
+# Load data ----
 
 pol <- readRDS("data/pol.Rds")
-
 
 matDist <- readRDS(file = "data/matDist.Rds")
 matDistAgr <- readRDS(file = "data/matDistAGR.Rds")
@@ -29,12 +29,8 @@ colnames(tabDist) <- c("ORI","DES","DIST")
 tabDistAgr <- melt(matDistAgr, value.name = "DIST", as.is = TRUE)
 colnames(tabDistAgr) <- c("ORIAGR","DESAGR","DIST")
 
-
-#Tableau avec les origines, destination, mode de transport et flux de naveteurs entre toute les communes 
 listTabflows <- readRDS(file ="data/listTabflows2.Rds")
-# listTabflows2 <- readRDS(file ="data/listtabflows.Rds")
 
-# tabFlows <- readRDS(file = "data/tabflows.Rds")
 tabFlows <- readRDS(file = "data/tabflows2.Rds")
 
 tabFlowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabFlows,idori = "ORI",iddes = "DES")
@@ -43,10 +39,6 @@ tabFlowsNoMode <- tabFlows %>%
   group_by(ORI, DES) %>%
   summarise(FLOW = sum(FLOW))
 
-#Tableau avec pour chaque commune le total des flux sortant, le total des flux entrant, 
-#et le total des flux intra
-#poptab <- toyspace::pop_tab(tabflows = tabFlows,tabdist = tabDist, idori = "ORI",iddes = "DES", idflow = "FLOW", iddist = "DIST")
-# poptabAgr <- toyspace::pop_tab(tabflows = tabFlowsAgr,idori = "ORIAGR",iddes = "DESAGR", idflow = "FLOW", iddist = "DIST")
 
 #couches tiers (voies ferré, réseau routier, gares.)
 vferre <- readRDS(file = "data/vferre.Rds")
@@ -318,39 +310,59 @@ addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.8){
   return(addLegend(map, colors = colorAdditions, labels = labelAdditions, opacity = opacity, position = "bottomright"))
 }
 
-theme_darkhc <- theme_bw() +
-  theme(plot.background = element_rect(fill = "#272B30"),
-        axis.line = element_line(color = "grey80"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_rect(fill = "#272B30"),
-        axis.title = element_text(family = "sans-serif", color = "grey80"),
-        axis.text = element_text(family = "sans-serif", color = "grey80"),
-        axis.ticks = element_blank(),
-        legend.position = "none",
-        legend.background = element_rect(fill = "#272B30"))
 
-# with lines
-theme_darklinehc <- theme_bw() +
-  theme(plot.background = element_rect(fill = "#272B30"),
-        axis.line = element_line(color = "grey80"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_rect(fill = "#272B30"),
-        axis.title = element_text(family = "sans-serif", color = "grey80"),
-        axis.text = element_text(family = "sans-serif", color = "grey80"),
-        axis.ticks = element_blank(),
-        legend.position = "bottom",
-        legend.title = element_blank(),
-        legend.key =  element_blank(),
-        legend.text = element_text(family = "sans-serif", color = "grey80"),
-        legend.background = element_rect(fill = "#272B30"))
+arr_aggregate <- function(before, after, tabflows, idori, iddes){
+  dicoAgr <- data.frame("OLDCODE" = before, "NEWCODE" = after)
+  tabflows$ORIAGR <- map_values(x = tabflows[[idori]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
+  tabflows$DESAGR <- map_values(x = tabflows[[iddes]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
+  return(tabflows)
+}
 
-
-
-## Toyspace functions ----
+spatunit_indices <- function(tabflows, idori, iddes, idflow){
+  tabflows$ORI <- tabflows[, idori]
+  tabflows$DES <- tabflows[, iddes]
+  tabflows$FLOW <- tabflows[, idflow]
+  tabflowIntra <- tabflows %>% filter(ORI == DES)
+  if(nrow(tabflowIntra) == 0){
+    totIntra <- data.frame(ORI = NA, TOTINTRA = NA)
+  } else {
+    totIntra <- tabflowIntra %>% 
+      group_by(ORI) %>% 
+      summarise(TOTINTRA = sum(FLOW, na.rm = TRUE)) %>% 
+      ungroup()
+  }
+  
+  tabflowOri <- tabflows[tabflows[idori] != tabflows[iddes], ]
+  tabflowOri <- aggregate(x = tabflowOri[[idflow]], by = list(tabflowOri[[idori]]), FUN = sum)
+  colnames(tabflowOri) <- c("ORI","TOTORI")
+  tabflowDes <- tabflows[tabflows[idori] != tabflows[iddes], ]
+  tabflowDes <- aggregate(x = tabflowDes[[idflow]], by = list(tabflowDes[[iddes]]), FUN = sum)
+  colnames(tabflowDes) <- c("DES","TOTDES")
+  tabflowDistOri <- aggregate(x = tabflows[[iddist]] , by = list(tabflows[[idori]]), FUN = sum)
+  colnames(tabflowDistOri) <- c("ORI","DISTORI")
+  tabflowDistDes <- aggregate(x = tabflows[[iddist]], by = list(tabflows[[iddes]]), FUN = sum)
+  colnames(tabflowDistDes) <- c("DES","DISTDES")
+  
+  if(nrow(tabflowIntra) == 0){
+    tabflowIntra <- data.frame(ORI = unique(c(tabflows[[idori]], tabflows[[iddes]])), TOTINTRA = 0)
+  } else {
+    tabflowIntra <- tabflowIntra}
+  poptab <- merge(x = tabflowIntra, y = tabflowOri, by.x = "ORI", by.y ="ORI", all.x = TRUE, all.y = TRUE)
+  poptab <- merge(x = poptab, y = tabflowDes, by.x = "ORI", by.y ="DES", all.x = TRUE, all.y = TRUE)
+  poptab <- merge(x = poptab, y = tabflowDistOri, by.x = "ORI", by.y ="ORI", all.x = TRUE, all.y = TRUE)
+  poptab <- merge(x = poptab, y = tabflowDistDes, by.x = "ORI", by.y ="DES", all.x = TRUE, all.y = TRUE)
+  
+  poptab$TOTINTRA <- ifelse(is.na(poptab$TOTINTRA), 0, poptab$TOTINTRA)
+  poptab$TOTORI <- ifelse(is.na(poptab$TOTORI), 0, poptab$TOTORI)
+  poptab$TOTDES <- ifelse(is.na(poptab$TOTDES), 0, poptab$TOTDES)
+  poptab$DISTORI <- ifelse(is.na(poptab$DISTORI), 0, poptab$DISTORI)
+  poptab$DISTDES <- ifelse(is.na(poptab$DISTDES), 0, poptab$DISTDES)
+  
+  poptab$TOTORIDES <- poptab$TOTORI + poptab$TOTDES
+  
+  colnames(poptab) <- c("CODGEO", "TOTINTRA","TOTORI", "TOTDES","DISTORI","DISTDES","TOTORIDES")
+  return(poptab)
+}
 
 mob_indic <- function(tabflows, idori, iddes, idflow, pol, idpol, poptab){
   
