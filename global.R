@@ -9,11 +9,12 @@ library(shinyjs)
 library(shinyWidgets)
 library(shinyBS)
 library(classInt)
+library(sf)
 library(raster)
 library(leaflet)
 library(flows)
 library(reshape2)
-library(dplyr)
+library(tidyverse)
 
 
 # Load data ----
@@ -28,131 +29,131 @@ arrAggreg <- "75056"
 
 # Selection and other functions ----
 
-GetLinks <- function(tabnav, tabdist, idori, iddes, iddist, ref, varsort, oneunit, thres){
-  print("getlink debut")
-  start_time <- Sys.time()
-  tabnav$KEY <- paste(tabnav[[idori]], tabnav[[iddes]], sep = "_")
-  tabdist$KEY <- paste(tabdist[[idori]], tabdist[[iddes]], sep = "_")
-  tabnav <- left_join(tabnav, tabdist[, c(iddist, "KEY")], by = "KEY") 
-  tabnav$DISTTOT <- tabnav$DIST*tabnav$FLOW
-  
-  refLib <- paste0(ref, "LIB")
-  oriDes <- paste0(c("ORI", "DES"), "LIB")
-  invRef <- oriDes[oriDes != refLib]
-  tabSel <- tabnav %>% 
-    group_by(ORI, DES) %>% 
-    summarise(FLOW = sum(FLOW), DIST = first(DIST), DISTTOT = sum(DISTTOT), ORILIB = first(ORILIB), DESLIB = first(DESLIB)) %>% 
-    as.data.frame(stringsAsFactors = FALSE)
-  tabSel <- tabSel[tabSel[[refLib]] == oneunit, ]
-  tabSel <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
-  nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
-  if (dim(tabSel)[1] == 0) {
-    #get a "false" link with the same departure and arrival so it seems unexisting
-    spLinks <- getLinkLayer(x = pol, df = tabFlows[1:0, c("ORI", "DES")])
-  }else{
-    spLinks <- getLinkLayer(x = pol, df = tabSel[1:nbRows, c("ORI", "DES")])
-  }
-  topDes <- spLinks
-  print("getlink fin")
-  end_time <- Sys.time()
-  print(end_time - start_time)
-  return(topDes)
-}
-
-city_Value <- function(tabflows,matDist,pol,idpol,var, ref,oneunit){
-  print("cityval debut")
-  start_time <- Sys.time()
-  tabIndex <- expand.grid(ORI = pol[[idpol]],
-                          DES = pol[[idpol]],
-                          stringsAsFactors = FALSE)
-  tabIndex <- left_join(x = tabIndex, y = tabflows, by = c("ORI", "DES"))
-  if(ref == "ORI"){
-    matflow <- dcast(tabIndex, formula = DES ~ ORI, value.var = "FLOW", fun.aggregate = sum)
-    matflow <- as.matrix(matflow[, -1])
-    matflow[is.na(matflow)] <- 0
-    tabCityDist <- as.data.frame(matDist[oneunit,])
-    tabCityFlow <- as.data.frame(matflow[,oneunit])
-  }else{
-    matflow <- dcast(tabIndex, formula = ORI ~ DES, value.var = "FLOW", fun.aggregate = sum)
-    matflow <- as.matrix(matflow[, -1])
-    matflow[is.na(matflow)] <- 0
-    tabCityDist <- as.data.frame(matDist[,oneunit])
-    tabCityFlow <- as.data.frame(matflow[,oneunit])
-  }
-  colnames(tabCityFlow)<-"DATA"
-  colnames(tabCityDist)<-"DIST"
-  tabCityFlow$ID <- colnames(matflow)
-  tabCityDist$ID <- rownames(tabCityDist)
-  tabCityDist <- dplyr::left_join(tabCityFlow,tabCityDist, by = "ID")
-  tabCityDist$DATA <- tabCityDist$DATA * tabCityDist$DIST
-  if(var == "FLOW"){
-    tabCity <- tabCityFlow
-    index <- "actifs"
-  }else{
-    tabCity <- tabCityDist
-    index <- "km"
-  }
-  spcom <- dplyr::left_join(pol,tabCity, by = c("insee" ="ID"))
-  if(sum(tabCityFlow$DATA) == 0 |sum(tabCityDist$DATA) == 0){
-    breaks <- c(0,1)
-  }else{
-    breaks <- sort(unique(append(abs(round(replace(getBreaks(spcom$DATA, nclass = 6,method = "fisher-jenks"),length(getBreaks(spcom$DATA, nclass = 6,method = "fisher-jenks"))+1,max(spcom$DATA)+1))),0)))
-  }
-  print("cityval fin")
-  end_time <- Sys.time()
-  print(end_time - start_time)
-  return(list( SPCOM = spcom, INDEX = index, BREAKS = breaks))
-}
-
-# get structure----
-Structure <- function(Flu,domFlowJob,domFlowPop,domFlowJP){
-  if(Flu=="iEmploi"){
-    dataflu <- domFlowJob$FLOWS
-    rayon <- ((sqrt(domFlowJob$PTS$TOTDES)/pi)*20)+200
-    cercle <- domFlowJob$PTS
-    valCercle <- domFlowJob$PTS$TOTDES
-    nom <- "Emploi : "
-    comm <- toupper(domFlowJob$PTS$nomcom)}
-  else if(Flu=="iPopulation"){
-    dataflu <- domFlowPop$FLOWS
-    rayon <- ((sqrt(domFlowPop$PTS$TOTORI)/pi)*20)+200
-    cercle <- domFlowPop$PTS
-    valCercle <- domFlowPop$PTS$TOTORI
-    nom <- "Population : "
-    comm <- toupper(domFlowPop$PTS$nomcom)}
-  else if(Flu=="iEmpPop"){
-    dataflu <- domFlowJP$FLOWS
-    rayon <- ((sqrt(domFlowJP$PTS$TOTORIDES)/pi)*20)+200
-    cercle <- domFlowJP$PTS
-    valCercle <- domFlowJP$PTS$TOTORIDES
-    nom <- "Population et emplois : "
-    comm <- toupper(domFlowJP$PTS$nomcom)}
-  return(list(dataflu = dataflu, rayon = rayon, cercle = cercle, valCercle = valCercle, nom = nom, comm = comm, dataflu = dataflu))
-}
-
-Filter_structure <- function(tabflows, idflow, before, after, pol, idpol, namepol, nameAgr, variable, label, centPol, idCentPol, poptab){
-  shinyjs::showElement(id = 'loading')
-  print("structure debut")
-  start_time <- Sys.time()
-  if(is.null(variable) == TRUE | is.null(label) == TRUE){
-    tabflows <- tabflows
-  }else{
-    tabflows <- tabflows[tabflows[[variable]]==label,]
-  }
-  tabFlowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabflows,idori = "ORI",iddes = "DES")
-  domFlowJob <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = "FLOW", poptab,
-                                        weight = "destination", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
-  domFlowPop <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = idflow, poptab,
-                                        weight = "origin", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
-  domFlowJP <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = idflow, poptab,
-                                       weight = "sum", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
-  shinyjs::hideElement(id = 'loading')
-  
-  print("structure fin")
-  end_time <- Sys.time()
-  print(end_time - start_time)
-  return(list(domFlowJob = domFlowJob, domFlowPop = domFlowPop, domFlowJP = domFlowJP))
-}
+# GetLinks <- function(tabnav, tabdist, idori, iddes, iddist, ref, varsort, oneunit, thres){
+#   print("getlink debut")
+#   start_time <- Sys.time()
+#   tabnav$KEY <- paste(tabnav[[idori]], tabnav[[iddes]], sep = "_")
+#   tabdist$KEY <- paste(tabdist[[idori]], tabdist[[iddes]], sep = "_")
+#   tabnav <- left_join(tabnav, tabdist[, c(iddist, "KEY")], by = "KEY") 
+#   tabnav$DISTTOT <- tabnav$DIST*tabnav$FLOW
+#   
+#   refLib <- paste0(ref, "LIB")
+#   oriDes <- paste0(c("ORI", "DES"), "LIB")
+#   invRef <- oriDes[oriDes != refLib]
+#   tabSel <- tabnav %>% 
+#     group_by(ORI, DES) %>% 
+#     summarise(FLOW = sum(FLOW), DIST = first(DIST), DISTTOT = sum(DISTTOT), ORILIB = first(ORILIB), DESLIB = first(DESLIB)) %>% 
+#     as.data.frame(stringsAsFactors = FALSE)
+#   tabSel <- tabSel[tabSel[[refLib]] == oneunit, ]
+#   tabSel <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
+#   nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
+#   if (dim(tabSel)[1] == 0) {
+#     #get a "false" link with the same departure and arrival so it seems unexisting
+#     spLinks <- getLinkLayer(x = pol, df = tabFlows[1:0, c("ORI", "DES")])
+#   }else{
+#     spLinks <- getLinkLayer(x = pol, df = tabSel[1:nbRows, c("ORI", "DES")])
+#   }
+#   topDes <- spLinks
+#   print("getlink fin")
+#   end_time <- Sys.time()
+#   print(end_time - start_time)
+#   return(topDes)
+# }
+# 
+# city_Value <- function(tabflows,matDist,pol,idpol,var, ref,oneunit){
+#   print("cityval debut")
+#   start_time <- Sys.time()
+#   tabIndex <- expand.grid(ORI = pol[[idpol]],
+#                           DES = pol[[idpol]],
+#                           stringsAsFactors = FALSE)
+#   tabIndex <- left_join(x = tabIndex, y = tabflows, by = c("ORI", "DES"))
+#   if(ref == "ORI"){
+#     matflow <- dcast(tabIndex, formula = DES ~ ORI, value.var = "FLOW", fun.aggregate = sum)
+#     matflow <- as.matrix(matflow[, -1])
+#     matflow[is.na(matflow)] <- 0
+#     tabCityDist <- as.data.frame(matDist[oneunit,])
+#     tabCityFlow <- as.data.frame(matflow[,oneunit])
+#   }else{
+#     matflow <- dcast(tabIndex, formula = ORI ~ DES, value.var = "FLOW", fun.aggregate = sum)
+#     matflow <- as.matrix(matflow[, -1])
+#     matflow[is.na(matflow)] <- 0
+#     tabCityDist <- as.data.frame(matDist[,oneunit])
+#     tabCityFlow <- as.data.frame(matflow[,oneunit])
+#   }
+#   colnames(tabCityFlow)<-"DATA"
+#   colnames(tabCityDist)<-"DIST"
+#   tabCityFlow$ID <- colnames(matflow)
+#   tabCityDist$ID <- rownames(tabCityDist)
+#   tabCityDist <- dplyr::left_join(tabCityFlow,tabCityDist, by = "ID")
+#   tabCityDist$DATA <- tabCityDist$DATA * tabCityDist$DIST
+#   if(var == "FLOW"){
+#     tabCity <- tabCityFlow
+#     index <- "actifs"
+#   }else{
+#     tabCity <- tabCityDist
+#     index <- "km"
+#   }
+#   spcom <- dplyr::left_join(pol,tabCity, by = c("insee" ="ID"))
+#   if(sum(tabCityFlow$DATA) == 0 |sum(tabCityDist$DATA) == 0){
+#     breaks <- c(0,1)
+#   }else{
+#     breaks <- sort(unique(append(abs(round(replace(getBreaks(spcom$DATA, nclass = 6,method = "fisher-jenks"),length(getBreaks(spcom$DATA, nclass = 6,method = "fisher-jenks"))+1,max(spcom$DATA)+1))),0)))
+#   }
+#   print("cityval fin")
+#   end_time <- Sys.time()
+#   print(end_time - start_time)
+#   return(list( SPCOM = spcom, INDEX = index, BREAKS = breaks))
+# }
+# 
+# # get structure----
+# Structure <- function(Flu,domFlowJob,domFlowPop,domFlowJP){
+#   if(Flu=="iEmploi"){
+#     dataflu <- domFlowJob$FLOWS
+#     rayon <- ((sqrt(domFlowJob$PTS$TOTDES)/pi)*20)+200
+#     cercle <- domFlowJob$PTS
+#     valCercle <- domFlowJob$PTS$TOTDES
+#     nom <- "Emploi : "
+#     comm <- toupper(domFlowJob$PTS$nomcom)}
+#   else if(Flu=="iPopulation"){
+#     dataflu <- domFlowPop$FLOWS
+#     rayon <- ((sqrt(domFlowPop$PTS$TOTORI)/pi)*20)+200
+#     cercle <- domFlowPop$PTS
+#     valCercle <- domFlowPop$PTS$TOTORI
+#     nom <- "Population : "
+#     comm <- toupper(domFlowPop$PTS$nomcom)}
+#   else if(Flu=="iEmpPop"){
+#     dataflu <- domFlowJP$FLOWS
+#     rayon <- ((sqrt(domFlowJP$PTS$TOTORIDES)/pi)*20)+200
+#     cercle <- domFlowJP$PTS
+#     valCercle <- domFlowJP$PTS$TOTORIDES
+#     nom <- "Population et emplois : "
+#     comm <- toupper(domFlowJP$PTS$nomcom)}
+#   return(list(dataflu = dataflu, rayon = rayon, cercle = cercle, valCercle = valCercle, nom = nom, comm = comm, dataflu = dataflu))
+# }
+# 
+# Filter_structure <- function(tabflows, idflow, before, after, pol, idpol, namepol, nameAgr, variable, label, centPol, idCentPol, poptab){
+#   shinyjs::showElement(id = 'loading')
+#   print("structure debut")
+#   start_time <- Sys.time()
+#   if(is.null(variable) == TRUE | is.null(label) == TRUE){
+#     tabflows <- tabflows
+#   }else{
+#     tabflows <- tabflows[tabflows[[variable]]==label,]
+#   }
+#   tabFlowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabflows,idori = "ORI",iddes = "DES")
+#   domFlowJob <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = "FLOW", poptab,
+#                                         weight = "destination", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
+#   domFlowPop <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = idflow, poptab,
+#                                         weight = "origin", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
+#   domFlowJP <- toyspace::nystuen_dacey(tabflows = tabFlowsAgr, idori = "ORIAGR", iddes = "DESAGR", idflow = idflow, poptab,
+#                                        weight = "sum", threspct = 1, pol = polAgr, idpol = "IDAGR", centPol = centPolAgr, idCentPol = "IDAGR")
+#   shinyjs::hideElement(id = 'loading')
+#   
+#   print("structure fin")
+#   end_time <- Sys.time()
+#   print(end_time - start_time)
+#   return(list(domFlowJob = domFlowJob, domFlowPop = domFlowPop, domFlowJP = domFlowJP))
+# }
 
 
 ######################
@@ -180,11 +181,12 @@ arrflow_aggregate <- function(before, after, tabflows, idori, iddes){
 
 arrunit_aggregate <- function(before, after, pol, idpol){
   dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
-  pol[[idpol]] <- map_values(x = pol[[idpol]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
   idpol <- enquo(idpol)
+  
   polAgr <- pol %>% 
+    mutate(CODGEO = map_values(x = pol %>% st_set_geometry(NULL) %>% pull(!!idpol), from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)) %>% 
     select(!!idpol) %>% 
-    group_by(idpol) %>% 
+    group_by(!!idpol) %>% 
     summarise()
   
   coords <- polAgr %>% st_centroid() %>% st_coordinates()
@@ -201,8 +203,11 @@ spatunit_indices <- function(pol, tabflows, idpol, idori, iddes, idflow, iddist)
   iddes <- enquo(iddes)
   idflow <- enquo(idflow)
   iddist <- enquo(iddist)
-
-  tabflows <- tabflows %>% mutate(COMDISTPROD = !!idflow * !!iddist)
+  
+  tabflows <- tabflows %>% 
+    mutate(FLOW = !!idflow, 
+           DIST = !!iddist, 
+           COMDISTPROD = FLOW * DIST)
   
   if(nrow(tabflows %>% filter(!!idori == !!iddes)) == 0){
     intraSum <- tibble(CODGEO = pol %>% pull(!!idpol), TOTINTRA = NA)
@@ -292,3 +297,27 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
   return(list(FLOWS = spatLines, NODES = typNode))
 }
 
+
+
+map_values <- function (x, from, to, warn_missing = TRUE)
+{
+  if (length(from) != length(to)) {
+    stop("`from` and `to` vectors are not the same length.")
+  }
+  if (!is.atomic(x)) {
+    stop("`x` must be an atomic vector.")
+  }
+  if (is.factor(x)) {
+    levels(x) <- map_values(levels(x), from, to, warn_missing)
+    return(x)
+  }
+  mapidx <- match(x, from)
+  mapidxNA <- is.na(mapidx)
+  from_found <- sort(unique(mapidx))
+  if (warn_missing && length(from_found) != length(from)) {
+    message("The following `from` values were not present in `x`: ",
+            paste(from[!(1:length(from) %in% from_found)], collapse = ", "))
+  }
+  x[!mapidxNA] <- to[mapidx[!mapidxNA]]
+  x
+}

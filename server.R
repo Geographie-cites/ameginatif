@@ -6,8 +6,13 @@ shinyServer(function(input, output, session) {
   
   # get data ----
   
+  observe({
+    print(c(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop))
+    str(select_data()$COM)
+  })
+  
   select_data <- reactive({
-    req(input$reloc, input$excess, input$modetrans, input$filterpop)
+    req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop)
     spaceConfig <- paste(input$reloc,input$excess, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop == "TOU"){
@@ -34,9 +39,9 @@ shinyServer(function(input, output, session) {
       tempFlows <- tempFlows %>% filter(MODE == "NM")
     }
     
-    infoCom <- spatunit_indices(pol = pol, tabflows = tempflows, idpol = CODGEO, idori = ORI, iddes = DES, idflow = FLOW, iddist = DIST)
-    tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempflows, idori = "ORI", iddes = "DES")
-    polAgr <- arrunit_aggregate(before = arrDesagg, after = arrAggreg, pol = pol, idpol = CODGEO)
+    infoCom <- spatunit_indices(pol = muniBound, tabflows = tempFlows, idpol = CODGEO, idori = ORI, iddes = DES, idflow = FLOW, iddist = DIST)
+    tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
+    polAgr <- arrunit_aggregate(before = arrDesagg, after = arrAggreg, pol = muniBound, idpol = CODGEO)
     infoComAgr <- spatunit_indices(pol = polAgr, 
                                    tabflows = tempflowsAgr, 
                                    idpol = CODGEO, 
@@ -45,7 +50,7 @@ shinyServer(function(input, output, session) {
                                    idflow = FLOW, 
                                    iddist = DIST)
 
-    return(list(TF = tempflows, TFAGR = tempflowsAgr, COM = infoCom, COMAGR = infoComAgr))
+    return(list(TF = tempFlows, TFAGR = tempflowsAgr, COM = infoCom, COMAGR = infoComAgr))
   })
   
   
@@ -70,9 +75,7 @@ shinyServer(function(input, output, session) {
       setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
       hideGroup("Réseau routier principal") %>%
       hideGroup("Réseau ferré") %>%
-      hideGroup("Stations ferroviaires") %>%
-      hideGroup(index$polygons)  %>%
-      hideGroup(index$layer)
+      hideGroup("Stations ferroviaires")
   })
   
 
@@ -80,14 +83,13 @@ shinyServer(function(input, output, session) {
     shinyjs::showElement(id = 'loading-content')
     shinyjs::showElement(id = 'loading')
     req(input$selindex)
-    
-    brks <- classIntervals(var = select_data()$COM[input$selindex],
+    brks <- classIntervals(var = select_data()$COM[[input$selindex]],
                            n = 6,
                            style = "fisher")$brks
     
     build_pal <- colorBin(palette = "Purples",
                        bins = brks,
-                       domain = select_data()$COM[input$selindex],
+                       domain = select_data()$COM[[input$selindex]],
                        na.color = "transparent")
 
     leafletProxy("mapindic") %>%
@@ -96,29 +98,7 @@ shinyServer(function(input, output, session) {
                   stroke = TRUE, weight = 0.5, opacity = 0.5, color = "grey", fill = TRUE,
                   fillColor = ~build_pal(eval(parse(text = input$selindex))), 
                   fillOpacity = 0.9, 
-                  label = select_data()$COM$LIBGEO) %>%
-      addPolylines(data = externalFeatures$ROAD,
-                   color = "grey",
-                   opacity = 0.6,
-                   weight = 1.3 ,
-                   stroke = TRUE,
-                   group = "Réseau routier principal",
-                   options = pathOptions(pane = "réseau_routier")) %>%
-      addPolylines(data = externalFeatures$RAIL,
-                   color = "grey",
-                   opacity = 1,
-                   weight = 1 ,
-                   stroke = TRUE,
-                   group = "Réseau ferré",
-                   dashArray = 2,
-                   options = pathOptions(pane = "voie_ferré")) %>%
-      addCircleMarkers(data = externalFeatures$RAILSTATION,
-                       radius = 2,
-                       stroke = FALSE,
-                       color = "grey",
-                       fillOpacity = 0.8,
-                       group = "Stations ferroviaires",
-                       options = pathOptions(pane = "station")) %>%
+                  label = select_data()$COM$LIBGEO)
       
     shinyjs::hideElement(id = 'loading-content')
     shinyjs::hideElement(id = 'loading')

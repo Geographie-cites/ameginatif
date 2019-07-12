@@ -89,6 +89,14 @@ shinyUI(bootstrapPage(
   ),
   
   #Display maps through the panel selection
+  absolutePanel(bottom = "0%",
+                top = "0%",
+                right = "0%",
+                left = "0%",
+                class = "panel panel-default",
+                style = "padding : 10px;
+                  text-align: center",
+                leafletOutput("mapindic", width="100%", height = "100%")),
   absolutePanel(bottom = "2%",
                 right = "25%",
                 left = "25%",
@@ -163,7 +171,8 @@ shinyUI(bootstrapPage(
                              
                              ####### Panneau Indice ##### 
                              tabPanel("Indices", 
-                                      radioButtons("selindex", label = NULL,
+                                      radioButtons("selindex", 
+                                                   label = NULL,
                                                    choices = list("Population active" = "TOTORI",
                                                                   "Emploi" = "TOTDES",
                                                                   "Solde absolu" = "ABSBAL",
@@ -173,15 +182,15 @@ shinyUI(bootstrapPage(
                                                                   "Distance moyenne à l'origine" = "AVGDISTORI",
                                                                   "Distance moyenne à destination" = "AVGDISTDES",
                                                                   "Distance totale à l'origine" = "SUMDISTORI",
-                                                                  "Distance totale à destination" = "SUMDISTDES")
-                                                   ),
+                                                                  "Distance totale à destination" = "SUMDISTDES"),
+                                                   selected = "TOTORI"),
                                       actionButton("index_descr", "Description")
                              ),
                              ####### Panneau Micro Flux     #####
                              tabPanel("Flux",
                                       selectInput("flucom", 
                                                   label = "Choisir une commune",
-                                                  choices = sort(centPol$LIBGEO),
+                                                  choices = c("PARIS1", "PARIS2"),
                                                   selected = ""),
                                       radioButtons("fluref", label = "Origine ou destination", choices = c("Origine" = "ORI", "Destination" = "DES"), selected = "ORI"),
                                       radioButtons("fluvar", label = "Quantité", choices = c("Nombre d'individus" = "FLOW", "Cumul de distance" = "DISTTOT"), selected = "FLOW"),
