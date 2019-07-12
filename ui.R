@@ -1,3 +1,7 @@
+###########################################
+##### Ameginatif - ui               #######
+###########################################
+
 shinyUI(bootstrapPage(
   theme = shinytheme("superhero"),
   useShinyjs(),
@@ -102,7 +106,7 @@ shinyUI(bootstrapPage(
                                             "Ouvrier" = "OUV",
                                             "Automobiliste" = "VP",
                                             "Transporté collectivement" = "TC",
-                                            "Travaille à domicile" = "DO",
+                                            "Travaille à domicile" = "IM",
                                             "Usagers de mode doux" = "NM"),
                              selected = "TOU",
                              inline = T)
@@ -159,17 +163,18 @@ shinyUI(bootstrapPage(
                              
                              ####### Panneau Indice ##### 
                              tabPanel("Indices", 
-                                      radioButtons("radioIndex", label = NULL,
-                                                   choices = list("Emploi" = "emploi",
-                                                                  "Population active" = "popact",
-                                                                  "Solde Relatif" = "soldeRel",
-                                                                  "Auto-Contention" = "Contention",
-                                                                  "Auto-Suffisance" = "Suffisance",
-                                                                  "Distance moyenne à l'origine" = "meanDistOri",
-                                                                  "Distance moyenne à destination" = "meanDistDes",
-                                                                  "Part des flux à l'origine" = "perOri",
-                                                                  "Part des flux à la destination" = "perDes"
-                                                   )),
+                                      radioButtons("selindex", label = NULL,
+                                                   choices = list("Population active" = "TOTORI",
+                                                                  "Emploi" = "TOTDES",
+                                                                  "Solde absolu" = "ABSBAL",
+                                                                  "Solde relatif" = "RELBAL",
+                                                                  "Autocontention" = "AUTOCONT",
+                                                                  "Autosuffisance" = "AUTOSUFF",
+                                                                  "Distance moyenne à l'origine" = "AVGDISTORI",
+                                                                  "Distance moyenne à destination" = "AVGDISTDES",
+                                                                  "Distance totale à l'origine" = "SUMDISTORI",
+                                                                  "Distance totale à destination" = "SUMDISTDES")
+                                                   ),
                                       actionButton("index_descr", "Description")
                              ),
                              ####### Panneau Micro Flux     #####

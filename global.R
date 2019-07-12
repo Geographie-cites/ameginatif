@@ -8,7 +8,7 @@ library(shinythemes)
 library(shinyjs)
 library(shinyWidgets)
 library(shinyBS)
-library(cartography)
+library(classInt)
 library(raster)
 library(leaflet)
 library(flows)
@@ -18,163 +18,15 @@ library(dplyr)
 
 # Load data ----
 
-pol <- readRDS("data/pol.Rds")
+muniBound <- readRDS("data/muniboundgeo.Rds")
+listTabflows <- readRDS(file ="data/listtabflowslabels.Rds")
+externalFeatures <- readRDS(file = "data/extfeatures.Rds")
 
-matDist <- readRDS(file = "data/matDist.Rds")
-matDistAgr <- readRDS(file = "data/matDistAGR.Rds")
-
-tabDist <- melt(matDist, value.name = "DIST", as.is = TRUE)
-colnames(tabDist) <- c("ORI","DES","DIST")
-
-tabDistAgr <- melt(matDistAgr, value.name = "DIST", as.is = TRUE)
-colnames(tabDistAgr) <- c("ORIAGR","DESAGR","DIST")
-
-listTabflows <- readRDS(file ="data/listTabflows2.Rds")
-
-tabFlows <- readRDS(file = "data/tabflows2.Rds")
-
-tabFlowsAgr <- toyspace::city_aggregate(before = before,after = after,tabflows = tabFlows,idori = "ORI",iddes = "DES")
-
-tabFlowsNoMode <- tabFlows %>%
-  group_by(ORI, DES) %>%
-  summarise(FLOW = sum(FLOW))
+arrDesagg <- paste0("751", ifelse(1:20 < 10, paste0("0", 1:20), 1:20))
+arrAggreg <- "75056"
 
 
-#couches tiers (voies ferré, réseau routier, gares.)
-vferre <- readRDS(file = "data/vferre.Rds")
-routier <- readRDS(file = "data/routier.Rds")
-station <- readRDS(file = "data/station.Rds")
-
-polAgr <- toyspace::pol_aggregate(before = before, after = after, pol = pol, idpol = "insee", namepol = "nomcom", nameAgr = "paris")
-
-#Coordonnées X Y des communes
-
-centPol <-readRDS("data/centPol.Rds")
-centPolAgr <-readRDS("data/centPolAgr.Rds")
-
-# commData <- toyspace::mob_indic(tabflows = tabFlows, tabdist = tabDist, idori = "ORI", iddes = "DES", idflow = "FLOW",iddist = "DIST", pol = pol, idpol = "insee")
-
-domFlowJob <- readRDS("data/domFlowJob.Rds")
-domFlowPop <- readRDS("data/domFlowPop.Rds")
-domFlowJP <- readRDS("data/domFlowJP.Rds")
-
-
-# FUNCTION GET ----
-
-# get index----
-
-Filter_indice <- function(tabflows, tabdist, idori, iddes, idflow, iddist, pol, idpol,variable, label, centPol, poptab){
-  print("filter indice debut")
-  start_time <- Sys.time()
-  shinyjs::showElement(id = 'loading')
-  if(is.null(variable) == TRUE | is.null(label) == TRUE){
-    tabflows <- tabflows
-  }else{
-    tabflows <- tabflows[tabflows[[variable]]==label,]
-  }
-  commdata <- toyspace::mob_indic(tabflows = tabflows, poptab = poptab, idori = idori, iddes = iddes, idflow = idflow, pol = pol, idpol = idpol)
-  commdata <- left_join(commdata, centPol[c("insee","lat","lon")],by = "insee")
-  shinyjs::hideElement(id = 'loading')
-  
-  print("filter indice fin")
-  end_time <- Sys.time()
-  print(end_time - start_time)
-  return(commdata)
-}
-
-
-Index <- function(mobi,commdata){
-  if(mobi=="emploi"){
-    data <- commdata$TOTDES
-    nom <- ""
-    unit <- "emplois"
-    color <- "PuOr"
-    breaks <- replace(sort(append(0,getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks"))), 6, max(commdata$RelBal)+0.1)
-    layer <- "taux"
-    polygons <- ""
-  } else if(mobi=="popact"){
-    data <- commdata$TOTORI
-    nom <- ""
-    unit <- "actifs"
-    color <- "PuOr"
-    breaks <- replace(sort(append(0,getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks"))), 6, max(commdata$RelBal)+0.1)
-    layer <- "taux"
-    polygons <- ""}
-  else if(mobi=="soldeRel"){
-    data <- commdata$RelBal
-    nom <- "Solde relatif : "
-    unit <- ""
-    color <- "PuOr"
-    breaks <- unique(sort(round(replace(append(0,getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks")), length(getBreaks(commdata$RelBal,nclass = 6,method = "fisher-jenks"))+1, max(commdata$RelBal, na.rm = TRUE)+0.1), digit = 2)))
-    layer <- "stock"
-    polygons <- "communes"}
-  else if(mobi=="Contention"){
-    data <- commdata$Contention
-    nom <- "Auto-Contention : "
-    unit <- "%"
-    color <- "Purples"
-    breaks <- unique(sort(replace(round(getBreaks(commdata$Contention,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$Contention,nclass = 6,method = "fisher-jenks"))+1, max(commdata$Contention, na.rm = TRUE)+0.1)))
-    layer <- "stock"
-    polygons <- "communes"}
-  else if(mobi=="Suffisance"){
-    data <- commdata$AutoSuff
-    nom <- "Auto-Suffisance : "
-    unit <- "%"
-    color <- "Purples"
-    breaks <- unique(sort(replace(round(getBreaks(commdata$AutoSuff,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$AutoSuff,nclass = 6,method = "fisher-jenks"))+1, max(commdata$AutoSuff, na.rm = TRUE)+0.1)))
-    layer <- "stock"
-    polygons <- "communes"}
-  else if(mobi=="meanDistOri"){
-    data <- commdata$DISTORI
-    nom <- "Distance moyenne à l'origine : "
-    unit <- "km"
-    color <- "Purples"
-    breaks <- unique(sort(replace(round(getBreaks(commdata$DISTORI,nclass = 6,method = "fisher-jenks"), digit = 2),length(getBreaks(commdata$DISTORI,nclass = 6,method = "fisher-jenks"))+1, max(commdata$DISTORI, na.rm = TRUE)+0.1)))
-    layer <- "stock"
-    polygons <- "communes"}
-  else if(mobi=="meanDistDes"){
-    data <- commdata$DISTDES
-    nom <- "Distance moyenne à destination : "
-    unit <- "km"
-    color <- "Purples"
-    breaks <- unique(sort(replace(round(getBreaks(commdata$DISTDES,nclass = 6,method = "fisher-jenks"), digit = 2),length(getBreaks(commdata$DISTDES,nclass = 6,method = "fisher-jenks"))+1, max(commdata$DISTDES, na.rm = TRUE)+0.1)))
-    layer <- "stock"
-    polygons <- "communes"}
-  else if(mobi=="perOri"){
-    data <- commdata$PerOri
-    nom <- "Part des flux à l'origine : "
-    unit <- "%"
-    color <- "Purples"
-    breaks <- unique(sort(replace(round(getBreaks(commdata$PerOri,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$PerOri,nclass = 6,method = "fisher-jenks"))+1, max(commdata$PerOri, na.rm = TRUE)+0.1)))
-    layer <- "stock"
-    polygons <- "communes"}
-  else if(mobi=="perDes"){
-    data <- commdata$PerDes
-    nom <- "Part des flux à la destination : "
-    unit <- "%"
-    color <- "Purples"
-    breaks <- unique(sort(replace(round(getBreaks(commdata$PerDes,nclass = 6,method = "fisher-jenks"), digit = 2), length(getBreaks(commdata$PerDes,nclass = 6,method = "fisher-jenks"))+1, max(commData$PerDes, na.rm = TRUE)+0.1)))
-    layer <- "stock"
-    polygons <- "communes"}
-  return(list(data = data,nom = nom,unit = unit,color = color,breaks = breaks,layer = layer,polygons = polygons, commdata = commdata))
-}
-
-
-
-
-
-# get flux ----
-
-Filter_flux <- function(tabflows, variable, label){
-  if(is.null(variable) == TRUE | is.null(label) == TRUE){
-    tabflows <- tabflows
-  }else{
-    tabflows <- tabflows[tabflows[[variable]]==label,]
-  }
-  shinyjs::hideElement(id = 'loading')
-  return(tabflows)
-}
-
+# Selection and other functions ----
 
 GetLinks <- function(tabnav, tabdist, idori, iddes, iddist, ref, varsort, oneunit, thres){
   print("getlink debut")
@@ -302,7 +154,12 @@ Filter_structure <- function(tabflows, idflow, before, after, pol, idpol, namepo
   return(list(domFlowJob = domFlowJob, domFlowPop = domFlowPop, domFlowJP = domFlowJP))
 }
 
-# Miscelaneous ----
+
+######################
+#### MISCELANEOUS ----
+######################
+
+# custom legend ----
 
 addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.8){
   colorAdditions <- paste0(colors, "; width:", sizes, "px; height:", sizes, "px")
@@ -310,91 +167,128 @@ addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.8){
   return(addLegend(map, colors = colorAdditions, labels = labelAdditions, opacity = opacity, position = "bottomright"))
 }
 
+# aggregate flows (arrondissements) ----
 
-arr_aggregate <- function(before, after, tabflows, idori, iddes){
-  dicoAgr <- data.frame("OLDCODE" = before, "NEWCODE" = after)
+arrflow_aggregate <- function(before, after, tabflows, idori, iddes){
+  dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
   tabflows$ORIAGR <- map_values(x = tabflows[[idori]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
   tabflows$DESAGR <- map_values(x = tabflows[[iddes]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
   return(tabflows)
 }
 
-spatunit_indices <- function(tabflows, idori, iddes, idflow){
-  tabflows$ORI <- tabflows[, idori]
-  tabflows$DES <- tabflows[, iddes]
-  tabflows$FLOW <- tabflows[, idflow]
-  tabflowIntra <- tabflows %>% filter(ORI == DES)
-  if(nrow(tabflowIntra) == 0){
-    totIntra <- data.frame(ORI = NA, TOTINTRA = NA)
-  } else {
-    totIntra <- tabflowIntra %>% 
-      group_by(ORI) %>% 
-      summarise(TOTINTRA = sum(FLOW, na.rm = TRUE)) %>% 
-      ungroup()
-  }
+# aggregate flows (arrondissements) ----
+
+arrunit_aggregate <- function(before, after, pol, idpol){
+  dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
+  pol[[idpol]] <- map_values(x = pol[[idpol]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
+  idpol <- enquo(idpol)
+  polAgr <- pol %>% 
+    select(!!idpol) %>% 
+    group_by(idpol) %>% 
+    summarise()
   
-  tabflowOri <- tabflows[tabflows[idori] != tabflows[iddes], ]
-  tabflowOri <- aggregate(x = tabflowOri[[idflow]], by = list(tabflowOri[[idori]]), FUN = sum)
-  colnames(tabflowOri) <- c("ORI","TOTORI")
-  tabflowDes <- tabflows[tabflows[idori] != tabflows[iddes], ]
-  tabflowDes <- aggregate(x = tabflowDes[[idflow]], by = list(tabflowDes[[iddes]]), FUN = sum)
-  colnames(tabflowDes) <- c("DES","TOTDES")
-  tabflowDistOri <- aggregate(x = tabflows[[iddist]] , by = list(tabflows[[idori]]), FUN = sum)
-  colnames(tabflowDistOri) <- c("ORI","DISTORI")
-  tabflowDistDes <- aggregate(x = tabflows[[iddist]], by = list(tabflows[[iddes]]), FUN = sum)
-  colnames(tabflowDistDes) <- c("DES","DISTDES")
-  
-  if(nrow(tabflowIntra) == 0){
-    tabflowIntra <- data.frame(ORI = unique(c(tabflows[[idori]], tabflows[[iddes]])), TOTINTRA = 0)
-  } else {
-    tabflowIntra <- tabflowIntra}
-  poptab <- merge(x = tabflowIntra, y = tabflowOri, by.x = "ORI", by.y ="ORI", all.x = TRUE, all.y = TRUE)
-  poptab <- merge(x = poptab, y = tabflowDes, by.x = "ORI", by.y ="DES", all.x = TRUE, all.y = TRUE)
-  poptab <- merge(x = poptab, y = tabflowDistOri, by.x = "ORI", by.y ="ORI", all.x = TRUE, all.y = TRUE)
-  poptab <- merge(x = poptab, y = tabflowDistDes, by.x = "ORI", by.y ="DES", all.x = TRUE, all.y = TRUE)
-  
-  poptab$TOTINTRA <- ifelse(is.na(poptab$TOTINTRA), 0, poptab$TOTINTRA)
-  poptab$TOTORI <- ifelse(is.na(poptab$TOTORI), 0, poptab$TOTORI)
-  poptab$TOTDES <- ifelse(is.na(poptab$TOTDES), 0, poptab$TOTDES)
-  poptab$DISTORI <- ifelse(is.na(poptab$DISTORI), 0, poptab$DISTORI)
-  poptab$DISTDES <- ifelse(is.na(poptab$DISTDES), 0, poptab$DISTDES)
-  
-  poptab$TOTORIDES <- poptab$TOTORI + poptab$TOTDES
-  
-  colnames(poptab) <- c("CODGEO", "TOTINTRA","TOTORI", "TOTDES","DISTORI","DISTDES","TOTORIDES")
-  return(poptab)
+  coords <- polAgr %>% st_centroid() %>% st_coordinates()
+  polAgr$LON <- coords[, 1]
+  polAgr$LAT <- coords[, 2]
+  return(polAgr)
 }
 
-mob_indic <- function(tabflows, idori, iddes, idflow, pol, idpol, poptab){
+# compute summary statistics at spatial unit level ----
+
+spatunit_indices <- function(pol, tabflows, idpol, idori, iddes, idflow, iddist){
+  idpol <- enquo(idpol)
+  idori <- enquo(idori)
+  iddes <- enquo(iddes)
+  idflow <- enquo(idflow)
+  iddist <- enquo(iddist)
+
+  tabflows <- tabflows %>% mutate(COMDISTPROD = !!idflow * !!iddist)
   
-  # auto-contention
-  poptab$Contention <- (poptab$TOTINTRA / (poptab$TOTORI + poptab$TOTINTRA))*100
-  poptab$Contention <- ifelse(is.na(poptab$Contention), 0, poptab$Contention)
+  if(nrow(tabflows %>% filter(!!idori == !!iddes)) == 0){
+    intraSum <- tibble(CODGEO = pol %>% pull(!!idpol), TOTINTRA = NA)
+  } else {
+    intraSum <- tabflows %>% 
+      filter(!!idori == !!iddes) %>% 
+      group_by(!!idori) %>% 
+      summarise(TOTINTRA = sum(!!idflow, na.rm = TRUE)) %>% 
+      transmute(CODGEO = !!idori, TOTINTRA)
+  }
   
-  # auto-sufficiency
-  poptab$AutoSuff <- (poptab$TOTINTRA / (poptab$TOTDES + poptab$TOTINTRA))*100
-  poptab$AutoSuff <- ifelse(is.na(poptab$AutoSuff), 0, poptab$AutoSuff)
+  oriSum <- tabflows %>% 
+    group_by(!!idori) %>% 
+    summarise(TOTORI = sum(!!idflow, na.rm = TRUE),
+              SUMDISTORI = sum(COMDISTPROD, na.rm = TRUE),
+              AVGDISTORI = SUMDISTORI / TOTORI) %>% 
+    ungroup() %>% 
+    transmute(CODGEO = !!idori, TOTORI, SUMDISTORI, AVGDISTORI)
   
-  # Relative Balance
-  poptab$RelBal <- (poptab$TOTDES - poptab$TOTORI) / (poptab$TOTORI + poptab$TOTDES)
-  poptab$RelBal <- ifelse(is.na(poptab$RelBal), 0, poptab$RelBal)
+  desSum <- tabflows %>% 
+    group_by(!!iddes) %>% 
+    summarise(TOTDES = sum(!!idflow, na.rm = TRUE),
+              SUMDISTDES = sum(COMDISTPROD, na.rm = TRUE),
+              AVGDISTDES = SUMDISTDES / TOTDES) %>% 
+    ungroup() %>% 
+    transmute(CODGEO = !!iddes, TOTDES, SUMDISTDES, AVGDISTDES)
   
-  # Difference
-  poptab$Difference <- poptab$TOTDES - poptab$TOTORI
-  poptab$Difference <- ifelse(is.na(poptab$Difference), 0, poptab$Difference)
+  tabUnits <- pol %>%
+    mutate(CODGEO = !!idpol) %>% 
+    left_join(y = intraSum, by = "CODGEO") %>%
+    left_join(y = oriSum, by = "CODGEO") %>%
+    left_join(y = desSum, by = "CODGEO") %>%
+    replace_na(replace = list(TOTINTRA = 0, TOTORI = 0, TOTDES = 0, DISTORI = 0, DISTDES = 0, AVGDISTORI = 0, AVGDISTDES = 0))
   
-  # Percentage of total flows at origin
-  poptab$PerOri <- (poptab$TOTORI*100) / sum(poptab$TOTORI)
-  poptab$PerOri <- ifelse(is.na(poptab$PerOri), 0, poptab$PerOri)
-  
-  # Percentage of total flows at destination
-  poptab$PerDes <- (poptab$TOTDES*100) / sum(poptab$TOTDES)
-  poptab$PerDes <- ifelse(is.na(poptab$PerDes), 0, poptab$PerDes)
-  
-  # Percentage of total internal flows
-  poptab$PerIntra <- (poptab$TOTINTRA*100) / sum(poptab$TOTINTRA)
-  poptab$PerIntra <- ifelse(is.na(poptab$PerIntra), 0, poptab$PerIntra)
-  
-  polTabFull <- left_join(pol, poptab, by = c(idpol = "CODGEO"))
-  
-  return(polTabFull)
+  allIndices <- tabUnits %>% 
+    mutate(AUTOCONT = 100 * TOTINTRA / TOTORI,
+           AUTOSUFF = 100 * TOTINTRA / TOTDES,
+           ABSBAL = (TOTDES - TOTINTRA) - (TOTORI - TOTINTRA),
+           RELBAL = ((TOTDES - TOTINTRA) - (TOTORI - TOTINTRA)) / ((TOTDES - TOTINTRA) + (TOTORI - TOTINTRA))) %>% 
+    replace_na(replace = list(AUTOCONT = 0, AUTOSUFF = 0, ABSBAL = 0, RELBAL = 0))
+
+  return(allIndices)
 }
+
+
+# compute dominant flows ----
+
+nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
+  idpol <- enquo(idpol)
+  idori <- enquo(idori)
+  iddes <- enquo(iddes)
+  idflow <- enquo(idflow)
+  wgt <- enquo(wgt)
+  
+  infoCom <- pol %>% 
+    st_set_geometry(NULL) %>% 
+    mutate(CODGEO = !!idpol,
+           WGT = !!wgt)
+  
+  tabFlows <- tabflows %>% 
+    mutate(ORI == !!idori, DES == !!iddes) %>% 
+    group_by(ORI, DES) %>% 
+    summarise(FLOW = sum(!!idflow, na.rm = TRUE)) %>% 
+    ungroup()
+  
+  flowsMax <- tabFlows %>%
+    filter(!!idori != !!iddes) %>% 
+    group_by(!!idori) %>% 
+    arrange(desc(!!idflow)) %>% 
+    slice(1) %>% 
+    left_join(y = infoCom[, c("CODGEO", "WGT", "LON", "LAT")], by = c("ORI" = "CODGEO")) %>%
+    left_join(y = infoCom[, c("CODGEO", "WGT", "LON", "LAT")], by = c("DES" = "CODGEO")) %>% 
+    filter(WGT.x < WGT.y)
+  
+  charLines <- paste0("LINESTRING(", flowsMax$LON.x, " ", flowsMax$LAT.x, ", ", flowsMax$LON.y, " ", flowsMax$LAT.y, ")")
+  spatLines <- st_sf(1:length(charLine), geometry = st_as_sfc(charLine, crs = 4326))
+  
+  
+  domFlows <- graph.data.frame(flowsMax %>% select(ORI, DES), directed = TRUE)
+  V(domFlows)$DEG <- degree(domFlows, mode = "in")
+  typNode <- igraph::as_data_frame(x = domFlows, what = "vertices") %>% 
+    arrange(desc(DEG)) %>% 
+    mutate(TYPE = ifelse(DEG > 0.333 * vcount(domFlows), 1, 
+                         ifelse(DEG > 2, 2, 3))) %>% 
+    left_join(infoCom[, c("CODGEO", "LON", "LAT")], by = c("name" = "CODGEO"))
+  
+  return(list(FLOWS = spatLines, NODES = typNode))
+}
+
