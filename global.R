@@ -23,8 +23,13 @@ muniBound <- readRDS("data/muniboundgeo.Rds")
 listTabflows <- readRDS(file ="data/listtabflowslabels.Rds")
 externalFeatures <- readRDS(file = "data/extfeatures.Rds")
 
+# prepare data ----
+
 arrDesagg <- paste0("751", ifelse(1:20 < 10, paste0("0", 1:20), 1:20))
 arrAggreg <- "75056"
+
+dicoUnits <- c("actifs", "emplois", "%", "%", "%", "%", "km/pers.", "km/pers.", "km", "km")
+names(dicoUnits) <- c("TOTORI", "TOTDES", "ABSBAL", "RELBAL", "AUTOCONT", "AUTOSUFF", "AVGDISTORI", "AVGDISTDES", "SUMDISTORI", "SUMDISTDES")
 
 
 # Selection and other functions ----
