@@ -6,10 +6,6 @@ shinyServer(function(input, output, session) {
   
   # get data ----
   
-  observe({
-    print(c(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop))
-    str(select_data()$COM)
-  })
   
   select_data <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop)
@@ -41,7 +37,7 @@ shinyServer(function(input, output, session) {
     
     infoCom <- spatunit_indices(pol = muniBound, tabflows = tempFlows, idpol = CODGEO, idori = ORI, iddes = DES, idflow = FLOW, iddist = DIST)
     tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
-    polAgr <- arrunit_aggregate(before = arrDesagg, after = arrAggreg, pol = muniBound, idpol = CODGEO)
+    polAgr <- muniBoundAgr
     infoComAgr <- spatunit_indices(pol = polAgr, 
                                    tabflows = tempflowsAgr, 
                                    idpol = CODGEO, 
@@ -49,60 +45,82 @@ shinyServer(function(input, output, session) {
                                    iddes = DES, 
                                    idflow = FLOW, 
                                    iddist = DIST)
-
+    
     return(list(TF = tempFlows, TFAGR = tempflowsAgr, COM = infoCom, COMAGR = infoComAgr))
   })
   
-  
-  #Indicators map Display  ----
   output$mapindic <- renderLeaflet({
     
     leaflet(options = leafletOptions(zoomControl = FALSE, minZoom = 8, maxZoom = 13)) %>%
-      addMapPane("choropleth", zIndex = 410) %>%  # Level 1
-      addMapPane("réseau_routier", zIndex = 420) %>%  # Level 2
-      addMapPane("voie_ferré", zIndex = 430) %>%  # Level 3
-      addMapPane("station", zIndex = 440) %>%  # Level 4
-      addMapPane("cercles", zIndex = 450) %>%  # Level 5
-      addMapPane("label", zIndex = 460) %>%  # Level 6
       addProviderTiles(provider = "CartoDB.PositronNoLabels",
                        options = providerTileOptions(opacity = 0.5)) %>%
+      fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)%>%
+      setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
+      addMapPane("road", zIndex = 420) %>%  
+      addMapPane("rail", zIndex = 430) %>%  
+      addMapPane("railstation", zIndex = 440) %>%  
       addLayersControl(
         position = "bottomright",
         overlayGroups = c("Réseau routier principal", "Réseau ferré","Stations ferroviaires"),
-        options = layersControlOptions(collapsed = T)
-      ) %>%
-      fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)%>%
-      setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
+        options = layersControlOptions(collapsed = T)) %>%
       hideGroup("Réseau routier principal") %>%
       hideGroup("Réseau ferré") %>%
-      hideGroup("Stations ferroviaires")
+      hideGroup("Stations ferroviaires") %>% 
+      addPolylines(data = externalFeatures$ROAD, color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau routier principal",
+                   options = pathOptions(pane = "road")) %>%
+      addPolylines(data = externalFeatures$RAIL, color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
+                   options = pathOptions(pane = "rail")) %>%
+      addCircleMarkers(data = externalFeatures$RAILSTATION,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "railstation"))
   })
   
-
+  
+  
   observe({
     shinyjs::showElement(id = 'loading-content')
     shinyjs::showElement(id = 'loading')
     req(input$selindex)
-    brks <- classIntervals(var = select_data()$COM[[input$selindex]],
-                           n = 6,
-                           style = "fisher")$brks
+    unitVar <- dicoUnits[names(dicoUnits) == input$selindex]
+    if(unitVar == "%"){
+      labelVar <- sprintf("<strong>%s</strong><br/> %.1f %s", select_data()$COM$LIBGEO, select_data()$COM[[input$selindex]], unitVar)
+    } else {
+      labelVar <- sprintf("<strong>%s</strong><br/> %.0f %s", select_data()$COM$LIBGEO, select_data()$COM[[input$selindex]], unitVar)
+    }
+    
+    brks <- classIntervals(var = select_data()$COM[[input$selindex]], n = 6, style = "fisher")$brks
     
     build_pal <- colorBin(palette = "Purples",
-                       bins = brks,
-                       domain = select_data()$COM[[input$selindex]],
-                       na.color = "transparent")
-
+                          bins = brks,
+                          domain = select_data()$COM[[input$selindex]],
+                          na.color = "transparent")
     leafletProxy("mapindic") %>%
-      clearShapes() %>%
+      clearShapes() %>% clearControls() %>% 
       addPolygons(data = select_data()$COM, 
-                  stroke = TRUE, weight = 0.5, opacity = 0.5, color = "grey", fill = TRUE,
+                  stroke = TRUE, weight = 0.7, opacity = 0.5, color = "grey", fill = TRUE,
                   fillColor = ~build_pal(eval(parse(text = input$selindex))), 
-                  fillOpacity = 0.9, 
-                  label = select_data()$COM$LIBGEO)
-      
+                  fillOpacity = 0.8,
+                  label = lapply(X = labelVar, FUN = htmltools::HTML)) %>% 
+      addLegend(pal = colorBin(palette = "Purples",
+                               bins = brks,
+                               domain = select_data()$COM[[input$selindex]], 
+                               pretty = TRUE,
+                               na.color = "transparent"),
+                values = select_data()$COM[[input$selindex]], 
+                opacity = 0.7,
+                title = NULL, 
+                position = "bottomright")
+    
     shinyjs::hideElement(id = 'loading-content')
     shinyjs::hideElement(id = 'loading')
   })
+  
   
   # # Flow map Display ----
   # output$mapflu <- renderLeaflet({

@@ -20,6 +20,7 @@ library(tidyverse)
 # Load data ----
 
 muniBound <- readRDS("data/muniboundgeo.Rds")
+muniBoundAgr <- readRDS("data/muniboundgeoag.Rds")
 listTabflows <- readRDS(file ="data/listtabflowslabels.Rds")
 externalFeatures <- readRDS(file = "data/extfeatures.Rds")
 
@@ -28,7 +29,7 @@ externalFeatures <- readRDS(file = "data/extfeatures.Rds")
 arrDesagg <- paste0("751", ifelse(1:20 < 10, paste0("0", 1:20), 1:20))
 arrAggreg <- "75056"
 
-dicoUnits <- c("actifs", "emplois", "%", "%", "%", "%", "km/pers.", "km/pers.", "km", "km")
+dicoUnits <- c("actifs", "emplois", "individus", "%", "%", "%", "km/pers.", "km/pers.", "km", "km")
 names(dicoUnits) <- c("TOTORI", "TOTDES", "ABSBAL", "RELBAL", "AUTOCONT", "AUTOSUFF", "AVGDISTORI", "AVGDISTDES", "SUMDISTORI", "SUMDISTDES")
 
 
@@ -185,18 +186,18 @@ arrflow_aggregate <- function(before, after, tabflows, idori, iddes){
 # aggregate flows (arrondissements) ----
 
 arrunit_aggregate <- function(before, after, pol, idpol){
-  dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
   idpol <- enquo(idpol)
-  
-  polAgr <- pol %>% 
-    mutate(CODGEO = map_values(x = pol %>% st_set_geometry(NULL) %>% pull(!!idpol), from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)) %>% 
-    select(!!idpol) %>% 
-    group_by(!!idpol) %>% 
+  dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
+  polAgr <- pol %>%
+    mutate(CODGEO = map_values(x = pol %>% st_set_geometry(NULL) %>% pull(!!idpol), from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)) %>%
+    select(!!idpol) %>%
+    group_by(!!idpol) %>%
     summarise()
-  
+
   coords <- polAgr %>% st_centroid() %>% st_coordinates()
   polAgr$LON <- coords[, 1]
   polAgr$LAT <- coords[, 2]
+  
   return(polAgr)
 }
 
