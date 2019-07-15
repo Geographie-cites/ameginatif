@@ -92,62 +92,66 @@ shinyServer(function(input, output, session) {
                    options = pathOptions(pane = "rail")) %>%
       addCircleMarkers(data = externalFeatures$RAILSTATION,
                        radius = 2,
-                       stroke = F,
+                       stroke = FALSE,
                        color = "grey",
-                       fillOpacity = 0.8,
+                       fillOpacity = 0.7,
                        group = "Stations ferroviaires",
                        options = pathOptions(pane = "railstation"))
     
     if(input$selindex %in% c("TOTORI", "TOTDES")){
-      brks <- classIntervals(var = select_data()$COM[[input$selindex]], n = 6, style = "fisher")$brks
-      build_pal <- colorBin(palette = "OrRd",
-                            bins = brks,
-                            domain = select_data()$COM[[input$selindex]],
-                            na.color = "transparent")
       leafBase %>%
         addPolygons(data = select_data()$COM, 
-                    stroke = TRUE, weight = 0.7, opacity = 0.5, color = "grey", fill = TRUE,
+                    stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
                     fillColor = "#D9D9D9", 
-                    fillOpacity = 0.5,
+                    fillOpacity = 0.3,
                     options = pathOptions(pane = "mymap")) %>% 
         addCircleMarkers(lng = select_data()$COM[["LON"]],
                          lat = select_data()$COM[["LAT"]],
                          color = "#CB6D53",
                          radius = 0.2 * sqrt(select_data()$COM[[input$selindex]] / pi),
                          stroke = FALSE,
-                         fillOpacity = 0.8,
+                         fillOpacity = 0.7,
+                         options = pathOptions(pane = "mymap"),
+                         label = lapply(X = labelVar, FUN = htmltools::HTML))
+    } else if(input$selindex == "ABSBAL") {
+      leafBase %>% 
+        addPolygons(data = select_data()$COM, 
+                    stroke = TRUE, weight = 0.7, opacity = 0.4, color = "grey", fill = TRUE,
+                    fillColor = "#D9D9D9", 
+                    fillOpacity = 0.3,
+                    options = pathOptions(pane = "mymap")) %>% 
+        addCircleMarkers(lng = select_data()$COM[["LON"]],
+                         lat = select_data()$COM[["LAT"]],
+                         color = ifelse(select_data()$COM[[input$selindex]] > 0, "#fab013", "#54478f"),
+                         radius = 1.5 * sqrt(sqrt(abs(select_data()$COM[[input$selindex]]) / pi)),
+                         stroke = TRUE,
+                         weight = 0.9,
+                         fillColor = build_palette(select_data()$COM[[input$selindex]])(select_data()$COM[[input$selindex]]),
+                         fillOpacity = 0.7,
                          options = pathOptions(pane = "mymap"),
                          label = lapply(X = labelVar, FUN = htmltools::HTML))
     } else {
-      brks <- classIntervals(var = select_data()$COM[[input$selindex]], n = 6, style = "fisher")$brks
-      build_pal <- colorBin(palette = "OrRd",
-                            bins = brks,
-                            domain = select_data()$COM[[input$selindex]],
-                            na.color = "transparent")
       leafBase %>% 
         addPolygons(data = select_data()$COM, 
-                    stroke = TRUE, weight = 0.7, opacity = 0.5, color = "grey", fill = TRUE,
-                    fillColor = ~build_pal(eval(parse(text = input$selindex))), 
-                    fillOpacity = 0.8,
+                    stroke = TRUE, weight = 0.9, opacity = 0.5, color = "grey", fill = TRUE,
+                    fillColor = build_palette(select_data()$COM[[input$selindex]])(select_data()$COM[[input$selindex]]), 
+                    fillOpacity = 0.7,
                     options = pathOptions(pane = "mymap"),
                     label = lapply(X = labelVar, FUN = htmltools::HTML)) %>% 
-        addLegend(pal = colorBin(palette = "OrRd",
-                                 bins = brks,
-                                 domain = select_data()$COM[[input$selindex]], 
-                                 pretty = TRUE,
-                                 na.color = "transparent"),
+        addLegend(pal = build_palette(select_data()$COM[[input$selindex]]),
                   values = select_data()$COM[[input$selindex]], 
                   opacity = 0.7,
                   title = NULL, 
                   position = "bottomright")
     }
     
-    
     shinyjs::hideElement(id = 'loading-content')
     shinyjs::hideElement(id = 'loading')
   })
   
-  
+  observe({
+    print(build_palette)
+  })
   # # Flow map Display ----
   # output$mapflu <- renderLeaflet({
   #   lflFlow <- leaflet(options = leafletOptions(zoomControl = FALSE, minZoom = 8, maxZoom = 13)) %>%

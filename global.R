@@ -166,6 +166,35 @@ names(dicoUnits) <- c("TOTORI", "TOTDES", "ABSBAL", "RELBAL", "AUTOCONT", "AUTOS
 #### MISCELANEOUS ----
 ######################
 
+
+# build palette
+
+build_palette <- function(x) {
+  valMin <- min(x, na.rm = TRUE)
+  valMax <- max(x, na.rm = TRUE)
+  if(valMin >= 0) {
+    brks <- classIntervals(var = x, n = 6, style = "fisher")$brks
+    myPal <- colorBin(palette = "PuOr",
+                      bins = brks,
+                      domain = x,
+                      na.color = "transparent",
+                      pretty = TRUE,
+                      reverse = TRUE)
+  } else {
+    oneThres <- ifelse(abs(valMin) > valMax, abs(valMin), valMax)
+    binWidth <- oneThres / 3
+    brks <- c(-oneThres, -2 * binWidth, -1 * binWidth, 0, binWidth, 2 * binWidth, oneThres)
+    myPal <- colorBin(palette = "PuOr",
+                      bins = brks,
+                      domain = x,
+                      na.color = "transparent",
+                      pretty = TRUE,
+                      reverse = TRUE)
+  }
+  return(myPal)
+}
+
+
 # custom legend ----
 
 addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.8){
@@ -193,7 +222,7 @@ arrunit_aggregate <- function(before, after, pol, idpol){
     select(!!idpol) %>%
     group_by(!!idpol) %>%
     summarise()
-
+  
   coords <- polAgr %>% st_centroid() %>% st_coordinates()
   polAgr$LON <- coords[, 1]
   polAgr$LAT <- coords[, 2]
@@ -254,7 +283,7 @@ spatunit_indices <- function(pol, tabflows, idpol, idori, iddes, idflow, iddist)
            ABSBAL = (TOTDES - TOTINTRA) - (TOTORI - TOTINTRA),
            RELBAL = ((TOTDES - TOTINTRA) - (TOTORI - TOTINTRA)) / ((TOTDES - TOTINTRA) + (TOTORI - TOTINTRA))) %>% 
     replace_na(replace = list(AUTOCONT = 0, AUTOSUFF = 0, ABSBAL = 0, RELBAL = 0))
-
+  
   return(allIndices)
 }
 
