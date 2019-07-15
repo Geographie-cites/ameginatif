@@ -56,6 +56,7 @@ shinyServer(function(input, output, session) {
                        options = providerTileOptions(opacity = 0.5)) %>%
       fitBounds(lng1 = 1.44, lat1 = 48.12, lng2 = 3.55, lat2 = 49.24)%>%
       setMaxBounds(-0.05, 46.62, 5.05, 50.73) %>%
+      addMapPane("mymap", zIndex = 410) %>% 
       addMapPane("road", zIndex = 420) %>%  
       addMapPane("rail", zIndex = 430) %>%  
       addMapPane("railstation", zIndex = 440) %>%  
@@ -65,20 +66,7 @@ shinyServer(function(input, output, session) {
         options = layersControlOptions(collapsed = T)) %>%
       hideGroup("Réseau routier principal") %>%
       hideGroup("Réseau ferré") %>%
-      hideGroup("Stations ferroviaires") %>% 
-      addPolylines(data = externalFeatures$ROAD, color = "grey", opacity = 0.6, weight = 1.3 ,
-                   stroke = TRUE, group = "Réseau routier principal",
-                   options = pathOptions(pane = "road")) %>%
-      addPolylines(data = externalFeatures$RAIL, color = "grey", opacity = 0.6, weight = 1.3 ,
-                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
-                   options = pathOptions(pane = "rail")) %>%
-      addCircleMarkers(data = externalFeatures$RAILSTATION,
-                       radius = 2,
-                       stroke = F,
-                       color = "grey",
-                       fillOpacity = 0.8,
-                       group = "Stations ferroviaires",
-                       options = pathOptions(pane = "railstation"))
+      hideGroup("Stations ferroviaires")
   })
   
   
@@ -94,28 +82,66 @@ shinyServer(function(input, output, session) {
       labelVar <- sprintf("<strong>%s</strong><br/> %.0f %s", select_data()$COM$LIBGEO, select_data()$COM[[input$selindex]], unitVar)
     }
     
-    brks <- classIntervals(var = select_data()$COM[[input$selindex]], n = 6, style = "fisher")$brks
+    leafBase <- leafletProxy("mapindic") %>%
+      clearShapes() %>% clearControls() %>% clearMarkers() %>% 
+      addPolylines(data = externalFeatures$ROAD, color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau routier principal",
+                   options = pathOptions(pane = "road")) %>%
+      addPolylines(data = externalFeatures$RAIL, color = "grey", opacity = 0.6, weight = 1.3 ,
+                   stroke = TRUE, group = "Réseau ferré",  dashArray = 2,
+                   options = pathOptions(pane = "rail")) %>%
+      addCircleMarkers(data = externalFeatures$RAILSTATION,
+                       radius = 2,
+                       stroke = F,
+                       color = "grey",
+                       fillOpacity = 0.8,
+                       group = "Stations ferroviaires",
+                       options = pathOptions(pane = "railstation"))
     
-    build_pal <- colorBin(palette = "Purples",
-                          bins = brks,
-                          domain = select_data()$COM[[input$selindex]],
-                          na.color = "transparent")
-    leafletProxy("mapindic") %>%
-      clearShapes() %>% clearControls() %>% 
-      addPolygons(data = select_data()$COM, 
-                  stroke = TRUE, weight = 0.7, opacity = 0.5, color = "grey", fill = TRUE,
-                  fillColor = ~build_pal(eval(parse(text = input$selindex))), 
-                  fillOpacity = 0.8,
-                  label = lapply(X = labelVar, FUN = htmltools::HTML)) %>% 
-      addLegend(pal = colorBin(palette = "Purples",
-                               bins = brks,
-                               domain = select_data()$COM[[input$selindex]], 
-                               pretty = TRUE,
-                               na.color = "transparent"),
-                values = select_data()$COM[[input$selindex]], 
-                opacity = 0.7,
-                title = NULL, 
-                position = "bottomright")
+    if(input$selindex %in% c("TOTORI", "TOTDES")){
+      brks <- classIntervals(var = select_data()$COM[[input$selindex]], n = 6, style = "fisher")$brks
+      build_pal <- colorBin(palette = "OrRd",
+                            bins = brks,
+                            domain = select_data()$COM[[input$selindex]],
+                            na.color = "transparent")
+      leafBase %>%
+        addPolygons(data = select_data()$COM, 
+                    stroke = TRUE, weight = 0.7, opacity = 0.5, color = "grey", fill = TRUE,
+                    fillColor = "#D9D9D9", 
+                    fillOpacity = 0.5,
+                    options = pathOptions(pane = "mymap")) %>% 
+        addCircleMarkers(lng = select_data()$COM[["LON"]],
+                         lat = select_data()$COM[["LAT"]],
+                         color = "#CB6D53",
+                         radius = 0.2 * sqrt(select_data()$COM[[input$selindex]] / pi),
+                         stroke = FALSE,
+                         fillOpacity = 0.8,
+                         options = pathOptions(pane = "mymap"),
+                         label = lapply(X = labelVar, FUN = htmltools::HTML))
+    } else {
+      brks <- classIntervals(var = select_data()$COM[[input$selindex]], n = 6, style = "fisher")$brks
+      build_pal <- colorBin(palette = "OrRd",
+                            bins = brks,
+                            domain = select_data()$COM[[input$selindex]],
+                            na.color = "transparent")
+      leafBase %>% 
+        addPolygons(data = select_data()$COM, 
+                    stroke = TRUE, weight = 0.7, opacity = 0.5, color = "grey", fill = TRUE,
+                    fillColor = ~build_pal(eval(parse(text = input$selindex))), 
+                    fillOpacity = 0.8,
+                    options = pathOptions(pane = "mymap"),
+                    label = lapply(X = labelVar, FUN = htmltools::HTML)) %>% 
+        addLegend(pal = colorBin(palette = "OrRd",
+                                 bins = brks,
+                                 domain = select_data()$COM[[input$selindex]], 
+                                 pretty = TRUE,
+                                 na.color = "transparent"),
+                  values = select_data()$COM[[input$selindex]], 
+                  opacity = 0.7,
+                  title = NULL, 
+                  position = "bottomright")
+    }
+    
     
     shinyjs::hideElement(id = 'loading-content')
     shinyjs::hideElement(id = 'loading')
