@@ -169,17 +169,17 @@ names(dicoUnits) <- c("TOTORI", "TOTDES", "ABSBAL", "RELBAL", "AUTOCONT", "AUTOS
 
 # build palette
 
-build_palette <- function(x) {
+build_palette <- function(x, palseq = NULL) {
   valMin <- min(x, na.rm = TRUE)
   valMax <- max(x, na.rm = TRUE)
   if(valMin >= 0) {
     brks <- classIntervals(var = x, n = 6, style = "fisher")$brks
-    myPal <- colorBin(palette = "PuOr",
+    myPal <- colorBin(palette = palseq,
                       bins = brks,
                       domain = x,
                       na.color = "transparent",
                       pretty = TRUE,
-                      reverse = TRUE)
+                      reverse = FALSE)
   } else {
     oneThres <- ifelse(abs(valMin) > valMax, abs(valMin), valMax)
     binWidth <- oneThres / 3
