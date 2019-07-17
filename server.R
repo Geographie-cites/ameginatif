@@ -50,7 +50,6 @@ shinyServer(function(input, output, session) {
   })
   
   output$mapindic <- renderLeaflet({
-    
     leaflet(options = leafletOptions(zoomControl = FALSE, minZoom = 8, maxZoom = 13)) %>%
       addProviderTiles(provider = "CartoDB.PositronNoLabels",
                        options = providerTileOptions(opacity = 0.5)) %>%
@@ -68,33 +67,21 @@ shinyServer(function(input, output, session) {
       hideGroup("Réseau ferré") %>%
       hideGroup("Stations ferroviaires")
   })
-  
-  
-  
+
+
+    
   observe({
-    shinyjs::showElement(id = 'loading-content')
-    shinyjs::showElement(id = 'loading')
-    req(input$selindex)
     unitVar <- dicoUnits[names(dicoUnits) == input$selindex]
-    
-    vecColors <- c("#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A")
-    names(vecColors) <- c("TOTORI", "SUMDISTORI", "TOTDES", "SUMDISTDES")
-    
-    vecPals <- c("OrRd", "YlOrBr", "PuBu", "BuPu", "Purples")
-    names(vecPals) <- c("AVGDISTORI", "AUTOCONT", "AVGDISTDES", "AUTOSUFF", "RELBAL")
-    
     coef <- ifelse(input$selindex %in% c("TOTORI", "TOTDES"), 0.2, 0.1)
-    
-    print(vecColors[names(vecColors == input$selindex)])
-    
+
     if(unitVar == "%"){
       labelVar <- sprintf("<strong>%s</strong><br/> %.1f %s", select_data()$COM$LIBGEO, select_data()$COM[[input$selindex]], unitVar)
     } else {
       labelVar <- sprintf("<strong>%s</strong><br/> %.0f %s", select_data()$COM$LIBGEO, select_data()$COM[[input$selindex]], unitVar)
     }
-    
+
     leafBase <- leafletProxy("mapindic") %>%
-      clearShapes() %>% clearControls() %>% clearMarkers() %>% 
+      clearShapes() %>% clearControls() %>% clearMarkers() %>%
       addPolylines(data = externalFeatures$ROAD, color = "grey", opacity = 0.6, weight = 1.3 ,
                    stroke = TRUE, group = "Réseau routier principal",
                    options = pathOptions(pane = "road")) %>%
@@ -108,14 +95,14 @@ shinyServer(function(input, output, session) {
                        fillOpacity = 0.7,
                        group = "Stations ferroviaires",
                        options = pathOptions(pane = "railstation"))
-    
+
     if(input$selindex %in% c("TOTORI", "TOTDES", "SUMDISTORI", "SUMDISTDES")){
       leafBase %>%
-        addPolygons(data = select_data()$COM, 
+        addPolygons(data = select_data()$COM,
                     stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
-                    fillColor = "#D9D9D9", 
+                    fillColor = "#D9D9D9",
                     fillOpacity = 0.3,
-                    options = pathOptions(pane = "mymap")) %>% 
+                    options = pathOptions(pane = "mymap")) %>%
         addCircleMarkers(lng = select_data()$COM[["LON"]],
                          lat = select_data()$COM[["LAT"]],
                          color = unname(vecColors[names(vecColors) == input$selindex]),
@@ -125,12 +112,12 @@ shinyServer(function(input, output, session) {
                          options = pathOptions(pane = "mymap"),
                          label = lapply(X = labelVar, FUN = htmltools::HTML))
     } else if(input$selindex == "ABSBAL") {
-      leafBase %>% 
-        addPolygons(data = select_data()$COM, 
+      leafBase %>%
+        addPolygons(data = select_data()$COM,
                     stroke = TRUE, weight = 0.7, opacity = 0.4, color = "grey", fill = TRUE,
-                    fillColor = "#D9D9D9", 
+                    fillColor = "#D9D9D9",
                     fillOpacity = 0.3,
-                    options = pathOptions(pane = "mymap")) %>% 
+                    options = pathOptions(pane = "mymap")) %>%
         addCircleMarkers(lng = select_data()$COM[["LON"]],
                          lat = select_data()$COM[["LAT"]],
                          color = ifelse(select_data()$COM[[input$selindex]] > 0, "#fab013", "#54478f"),
@@ -142,27 +129,25 @@ shinyServer(function(input, output, session) {
                          options = pathOptions(pane = "mymap"),
                          label = lapply(X = labelVar, FUN = htmltools::HTML))
     } else {
-      leafBase %>% 
-        addPolygons(data = select_data()$COM, 
+      leafBase %>%
+        addPolygons(data = select_data()$COM,
                     stroke = TRUE, weight = 0.9, opacity = 0.5, color = "grey", fill = TRUE,
-                    fillColor = build_palette(select_data()$COM[[input$selindex]], palseq = unname(vecPals[names(vecPals) == input$selindex]))(select_data()$COM[[input$selindex]]), 
+                    fillColor = build_palette(select_data()$COM[[input$selindex]], palseq = unname(vecPals[names(vecPals) == input$selindex]))(select_data()$COM[[input$selindex]]),
                     fillOpacity = 0.7,
                     options = pathOptions(pane = "mymap"),
-                    label = lapply(X = labelVar, FUN = htmltools::HTML)) %>% 
+                    label = lapply(X = labelVar, FUN = htmltools::HTML)) %>%
         addLegend(pal = build_palette(select_data()$COM[[input$selindex]], palseq = unname(vecPals[names(vecPals) == input$selindex])),
-                  values = select_data()$COM[[input$selindex]], 
+                  values = select_data()$COM[[input$selindex]],
                   opacity = 0.7,
-                  title = NULL, 
+                  title = NULL,
                   position = "bottomright")
     }
-    
-    shinyjs::hideElement(id = 'loading-content')
-    shinyjs::hideElement(id = 'loading')
+
   })
-
- 
+  
+  
   # description ----
-
+  
   observeEvent(input$index_descr, {
     showModal(modalDialog(
       includeHTML("coat/index_descr.html"),
@@ -170,7 +155,7 @@ shinyServer(function(input, output, session) {
       footer = NULL
     ))
   })
-
+  
   observeEvent(input$flux_descr, {
     showModal(modalDialog(
       includeHTML("coat/flux_descr.html"),
@@ -178,7 +163,7 @@ shinyServer(function(input, output, session) {
       footer = NULL
     ))
   })
-
+  
   observeEvent(input$pool_descr, {
     showModal(modalDialog(
       includeHTML("coat/pool_descr.html"),
@@ -186,7 +171,7 @@ shinyServer(function(input, output, session) {
       footer = NULL
     ))
   })
-
+  
   observeEvent(input$fludom_descr, {
     showModal(modalDialog(
       includeHTML("coat/fludom_descr.html"),
@@ -194,12 +179,12 @@ shinyServer(function(input, output, session) {
       footer = NULL
     ))
   })
-
+  
   showModal(modalDialog(
     includeHTML("coat/welcome.html"),
     easyClose = TRUE,
     footer = NULL
   ))
-
-
+  
+  
 })
