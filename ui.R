@@ -1,7 +1,7 @@
 shinyUI(navbarPage(title = "Améginat-IF", 
                    id = "nav",
                    theme = shinytheme("sandstone"),
-                   tabPanel("Indices de mobilité",
+                   tabPanel("Indicateurs",
                             div(class="outer",
                                 tags$head(
                                   # Include our custom CSS
@@ -46,7 +46,7 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                                            selected = "TOU",
                                                            inline = FALSE)
                                 ),
-
+                                
                                 absolutePanel(id ="controls",
                                               top = "3%", 
                                               bottom = "auto",
@@ -88,6 +88,27 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                                                          
                                                          )
                                               )
+                                )
+                            )
+                   ),
+                   tabPanel("Oursins",
+                            div(class="outer",
+                                tags$head(
+                                  # Include our custom CSS
+                                  includeCSS("styles.css")
+                                ),
+                                leafletOutput("mapflow", width = "100%", height = "100%"),
+                                absolutePanel(id = "controls", class = "panel panel-default", fixed = TRUE,
+                                              draggable = FALSE, top = 80, left = 20, right = "auto", bottom = "auto",
+                                              width = 300, height = "auto",
+                                              selectInput("flucom", 
+                                                          label = "Choisir une commune",
+                                                          choices = sort(muniBound$LIBGEO),
+                                                          selected = ""),
+                                              radioButtons("fluref", label = "Origine ou destination", choices = c("Origine" = "ORI", "Destination" = "DES"), selected = "ORI"),
+                                              radioButtons("fluvar", label = "Quantité", choices = c("Nombre d'individus" = "FLOW", "Cumul de distance" = "SUMDIST"), selected = "FLOW"),
+                                              sliderInput("fluthr", label = "Top", min = 2, max = 100, step = 1, value = 3),
+                                              actionButton("flux_descr", "Description")
                                 )
                             )
                    )

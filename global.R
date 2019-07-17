@@ -10,7 +10,7 @@ library(shinyBS)
 library(classInt)
 library(sf)
 library(leaflet)
-library(dplyr)
+library(tidyverse)
 
 
 # Load data ----
@@ -35,13 +35,33 @@ vecPals <- c("OrRd", "YlOrBr", "PuBu", "BuPu", "Purples")
 names(vecPals) <- c("AVGDISTORI", "AUTOCONT", "AVGDISTDES", "AUTOSUFF", "RELBAL")
 
 
+# get top links ----
 
-######################
-#### MISCELANEOUS ----
-######################
+get_toplinks <- function(tabflows, pol, ref, varsort, oneunit, thres){
+  refLib <- paste0(ref, "LIB")
+  oriDes <- paste0(c("ORI", "DES"), "LIB")
+  invRef <- oriDes[oriDes != refLib]
+  tabflows <- tabflows %>% 
+    mutate(FLOWDIST = FLOW * DIST) %>% 
+    group_by(ORI, DES) %>% 
+    summarise(FLOW = sum(FLOW, na.rm = TRUE), 
+              SUMDIST = sum(FLOWDIST, na.rm = TRUE), 
+              ORILIB = first(ORILIB), 
+              DESLIB = first(DESLIB)) %>% 
+    ungroup()
+    
+  tabSel <- tabflows[tabflows[[refLib]] == oneunit, ] 
+  tabSel <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
+  
+  nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
+  spLinks <- get_linklayer(x = pol, df = tabSel[1:nbRows, c("ORI", "DES")])
+  spPol <- pol[pol$CODGEO %in% spLinks$DES, ]
+  topDes <- list(POLYG = spPol, LINES = spLinks)
+  return(topDes)
+}
 
 
-# build palette
+# build palette ----
 
 build_palette <- function(x, palseq = NULL) {
   valMin <- min(x, na.rm = TRUE)
@@ -66,15 +86,6 @@ build_palette <- function(x, palseq = NULL) {
                       reverse = TRUE)
   }
   return(myPal)
-}
-
-
-# custom legend ----
-
-addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.8){
-  colorAdditions <- paste0(colors, "; width:", sizes, "px; height:", sizes, "px")
-  labelAdditions <- paste0("<div style='display: inline-block;height: ", sizes, "px;margin-bottom: 10px;line-height: ", sizes, "px;'>", labels, "</div>")
-  return(addLegend(map, colors = colorAdditions, labels = labelAdditions, opacity = opacity, position = "bottomright"))
 }
 
 # aggregate flows (arrondissements) ----
@@ -206,7 +217,52 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
   return(list(FLOWS = spatLines, NODES = typNode))
 }
 
+# get link layer (from cartography packages) ----
 
+get_linklayer <- function (x, xid = NULL, df, dfid = NULL, spdf, spdf2 = NULL, 
+                           spdfid = NULL, spdf2id = NULL, dfids = NULL, dfide = NULL) 
+{
+  if (sum(missing(spdf), is.null(spdf2), is.null(spdfid), is.null(spdf2id), 
+          is.null(dfids), is.null(dfide)) != 6) {
+    stop("spdf, spdf2, spdfid, spdf2id, dfids and dfide are defunct arguments; last used in version 1.4.2.", 
+         call. = FALSE)
+  }
+  if (methods::is(x, "Spatial")) {
+    x <- sf::st_as_sf(x)
+  }
+  if (is.null(xid)) {
+    xid <- names(x)[1]
+  }
+  if (is.null(dfid)) {
+    dfid <- names(df)[1:2]
+  }
+  x2 <- data.frame(id = x[[xid]], sf::st_coordinates(sf::st_centroid(x = sf::st_geometry(x), 
+                                                                     of_largest_polygon = max(sf::st_is(sf::st_as_sf(x), "MULTIPOLYGON")))), 
+                   stringsAsFactors = FALSE)
+  df <- df[, dfid]
+  link <- merge(df, x2, by.x = dfid[2], by.y = "id", all.x = TRUE)
+  link <- merge(link, x2, by.x = dfid[1], by.y = "id", all.x = TRUE)
+  names(link)[3:6] <- c("xj", "yj", "xi", "yi")
+  d1 <- nrow(link)
+  link <- link[!is.na(link$xj) & !is.na(link$xi), ]
+  d2 <- nrow(link)
+  if (d2 == 0) {
+    stop("No links were created. dfid and xid do not match", 
+         call. = FALSE)
+  }
+  if ((d1 - d2) > 0) {
+    warning(paste0((d1 - d2), " links were not created. Some dfid were not found in xid"), 
+            call. = FALSE)
+  }
+  stringo <- paste0("LINESTRING(", link$xi, " ", link$yi, ", ", 
+                    link$xj, " ", link$yj, ")")
+  link <- sf::st_sf(link[, dfid], geometry = sf::st_as_sfc(stringo, 
+                                                           crs = sf::st_crs(x)))
+  return(link)
+}
+
+
+# map values (from plyr package) ----
 
 map_values <- function (x, from, to, warn_missing = TRUE)
 {
