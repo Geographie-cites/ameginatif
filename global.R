@@ -10,6 +10,7 @@ library(shinyBS)
 library(classInt)
 library(sf)
 library(leaflet)
+library(igraph)
 library(tidyverse)
 
 
@@ -40,7 +41,8 @@ names(vecPals) <- c("AVGDISTORI", "AUTOCONT", "AVGDISTDES", "AUTOSUFF", "RELBAL"
 get_toplinks <- function(tabflows, pol, ref, varsort, oneunit, thres){
   refLib <- paste0(ref, "LIB")
   oriDes <- paste0(c("ORI", "DES"), "LIB")
-  invRef <- oriDes[oriDes != refLib]
+  invRef <- ifelse(ref == "ORI", "DES", "ORI")
+  invReflib <- oriDes[oriDes != refLib]
   tabflows <- tabflows %>% 
     mutate(FLOWDIST = FLOW * DIST) %>% 
     group_by(ORI, DES) %>% 
@@ -49,14 +51,26 @@ get_toplinks <- function(tabflows, pol, ref, varsort, oneunit, thres){
               ORILIB = first(ORILIB), 
               DESLIB = first(DESLIB)) %>% 
     ungroup()
-    
-  tabSel <- tabflows[tabflows[[refLib]] == oneunit, ] 
-  tabSel <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
   
+  tabSel <- tabflows[tabflows[[refLib]] == oneunit, ]
+  tabSel$CODGEO <- tabSel[[invRef]]
+  polSel <- pol[pol$CODGEO %in% unique(c(tabSel$ORI, tabSel$DES)), ] %>% 
+    left_join(tabSel[, c("CODGEO", "FLOW", "SUMDIST")], by = "CODGEO")
+  
+  tabSelSorted <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
   nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
-  spLinks <- get_linklayer(x = pol, df = tabSel[1:nbRows, c("ORI", "DES")])
-  spPol <- pol[pol$CODGEO %in% spLinks$DES, ]
-  topDes <- list(POLYG = spPol, LINES = spLinks)
+  tabFinal <- tabSelSorted[1:nbRows, ] %>% 
+    left_join(polSel %>% st_set_geometry(NULL) %>% select(CODGEO, LON, LAT), by = c("ORI" = "CODGEO")) %>% 
+    left_join(polSel %>% st_set_geometry(NULL) %>% select(CODGEO, LON, LAT), by = c("DES" = "CODGEO"))
+  
+  
+  charLines <- paste0("LINESTRING(", tabFinal$LON.x, " ", tabFinal$LAT.x, ", ", tabFinal$LON.y, " ", tabFinal$LAT.y, ")")
+  spatLines <- st_sf(1:length(charLines), geometry = st_as_sfc(charLines, crs = 4326))
+  spatLines$REF <- tabFinal[, invReflib]
+  spatLines$FLOW <- tabFinal$FLOW
+  spatLines$SUMDIST <- tabFinal$SUMDIST
+  
+  topDes <- list(POLYG = polSel, LINES = spatLines)
   return(topDes)
 }
 
@@ -92,28 +106,32 @@ build_palette <- function(x, palseq = NULL) {
 
 arrflow_aggregate <- function(before, after, tabflows, idori, iddes){
   dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
-  tabflows$ORIAGR <- map_values(x = tabflows[[idori]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
-  tabflows$DESAGR <- map_values(x = tabflows[[iddes]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
-  return(tabflows)
+  tabflows$ORI <- map_values(x = tabflows[[idori]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
+  tabflows$DES <- map_values(x = tabflows[[iddes]], from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)
+  tabflowsAgr <- tabflows %>% 
+    group_by(ORI, DES, CSP, MODE) %>% 
+    summarise(FLOW = sum(FLOW, na.rm = TRUE), DIST = first(DIST)) %>% 
+    ungroup()
+  return(tabflowsAgr)
 }
 
 # aggregate flows (arrondissements) ----
 
-arrunit_aggregate <- function(before, after, pol, idpol){
-  idpol <- enquo(idpol)
-  dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
-  polAgr <- pol %>%
-    mutate(CODGEO = map_values(x = pol %>% st_set_geometry(NULL) %>% pull(!!idpol), from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)) %>%
-    select(!!idpol) %>%
-    group_by(!!idpol) %>%
-    summarise()
-  
-  coords <- polAgr %>% st_centroid() %>% st_coordinates()
-  polAgr$LON <- coords[, 1]
-  polAgr$LAT <- coords[, 2]
-  
-  return(polAgr)
-}
+# arrunit_aggregate <- function(before, after, pol, idpol){
+#   idpol <- enquo(idpol)
+#   dicoAgr <- tibble(OLDCODE = before, NEWCODE = after)
+#   polAgr <- pol %>%
+#     mutate(CODGEO = map_values(x = pol %>% st_set_geometry(NULL) %>% pull(!!idpol), from = dicoAgr$OLDCODE, to = dicoAgr$NEWCODE)) %>%
+#     select(!!idpol) %>%
+#     group_by(!!idpol) %>%
+#     summarise()
+#   
+#   coords <- polAgr %>% st_centroid() %>% st_coordinates()
+#   polAgr$LON <- coords[, 1]
+#   polAgr$LAT <- coords[, 2]
+#   
+#   return(polAgr)
+# }
 
 # compute summary statistics at spatial unit level ----
 
@@ -180,12 +198,11 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
   idori <- enquo(idori)
   iddes <- enquo(iddes)
   idflow <- enquo(idflow)
-  wgt <- enquo(wgt)
   
   infoCom <- pol %>% 
     st_set_geometry(NULL) %>% 
-    mutate(CODGEO = !!idpol,
-           WGT = !!wgt)
+    mutate(CODGEO = !!idpol)
+  infoCom$WGT <- infoCom[[wgt]]
   
   tabFlows <- tabflows %>% 
     mutate(ORI == !!idori, DES == !!iddes) %>% 
@@ -203,7 +220,7 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
     filter(WGT.x < WGT.y)
   
   charLines <- paste0("LINESTRING(", flowsMax$LON.x, " ", flowsMax$LAT.x, ", ", flowsMax$LON.y, " ", flowsMax$LAT.y, ")")
-  spatLines <- st_sf(1:length(charLine), geometry = st_as_sfc(charLine, crs = 4326))
+  spatLines <- st_sf(1:length(charLines), geometry = st_as_sfc(charLines, crs = 4326))
   
   
   domFlows <- graph.data.frame(flowsMax %>% select(ORI, DES), directed = TRUE)
@@ -212,7 +229,11 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
     arrange(desc(DEG)) %>% 
     mutate(TYPE = ifelse(DEG > 0.333 * vcount(domFlows), 1, 
                          ifelse(DEG > 2, 2, 3))) %>% 
-    left_join(infoCom[, c("CODGEO", "LON", "LAT")], by = c("name" = "CODGEO"))
+    left_join(infoCom[, c("CODGEO", "LIBGEO", "LON", "LAT")], by = c("name" = "CODGEO")) %>% 
+    st_as_sf(coords = c("LON", "LAT"), 
+             agr = "constant",
+             crs = 4326,
+             stringsAsFactors = FALSE)
   
   return(list(FLOWS = spatLines, NODES = typNode))
 }
