@@ -8,7 +8,7 @@ shinyServer(function(input, output, session) {
   
   select_dataone <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop1)
-    spaceConfig <- paste(input$reloc,input$excess, input$modetrans, sep = "_")
+    spaceConfig <- paste(input$reloc, input$excess, input$modetrans, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop1 == "TOU"){
       tempFlows <- tempFlows
@@ -50,7 +50,7 @@ shinyServer(function(input, output, session) {
   
   select_datatwo <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop2)
-    spaceConfig <- paste(input$reloc,input$excess, input$modetrans, sep = "_")
+    spaceConfig <- paste(input$reloc, input$excess, input$modetrans, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop2 == "TOU"){
       tempFlows <- tempFlows
@@ -92,7 +92,7 @@ shinyServer(function(input, output, session) {
   
   select_datathree <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop3)
-    spaceConfig <- paste(input$reloc,input$excess, input$modetrans, sep = "_")
+    spaceConfig <- paste(input$reloc, input$excess, input$modetrans, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop3 == "TOU"){
       tempFlows <- tempFlows
@@ -383,7 +383,19 @@ shinyServer(function(input, output, session) {
   
   
   
+  # TAB4: configure plotly device ----
+  
+  output$numsum <- renderPlotly({
+    req(input$reloc, input$excess, input$modetrans)
+    spaceConfig <- paste(input$reloc, input$excess, input$modetrans, sep = "_")
+    draw_plotly(data = listAggregates, scenar = spaceConfig, variable = input$varsplit, indic = input$varindic)
+  })
+  
+  
+  
   # tabs description ----
+  
+  output$mytext <- renderText({paste(" ")})
   
   observeEvent(input$index_descr, {
     showModal(modalDialog(

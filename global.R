@@ -21,6 +21,7 @@ muniBound <- readRDS("data/muniboundgeo.Rds")
 muniBoundAgr <- readRDS("data/muniboundgeoag.Rds")
 # listTabflows <- readRDS(file ="data/listtabflowslabels.Rds")
 listTabflows <- readRDS(file ="data/listwithmode.Rds")
+listAggregates <- readRDS(file ="data/listaggreg.Rds")
 externalFeatures <- readRDS(file = "data/extfeatures.Rds")
 
 # prepare data ----
@@ -146,6 +147,30 @@ arrflow_aggregate <- function(before, after, tabflows, idori, iddes){
 #   
 #   return(polAgr)
 # }
+
+
+# draw ggplot and convert to plotly ----
+
+draw_plotly <- function(data, scenar, variable, indic){
+  oneAgr <- data[[scenar]]
+  refAgr <- data[["ACT_ACT_ACT"]]
+  tabAgr <- bind_rows(oneAgr, refAgr)
+  tabAgr$CONFIG <- c(rep("SCENARIO", 16), rep("ACTUEL", 16))
+  tabAgr$VALEUR <- tabAgr[[indic]]
+  
+  valY <- ifelse(indic == "FLOW", "Flux (milliers d'individus)", 
+                 ifelse(indic == "SUMDIST", "Portée totale (milliers de km)", "Portée moyenne (km/pers.)"))
+  
+  p <- ggplot(tabAgr[tabAgr$VAR == variable, ]) +
+    geom_bar(aes(x = MODALITE, y = VALEUR, fill = CONFIG), stat = "identity", position = "dodge") +
+    scale_fill_manual(values = c("grey80", "firebrick")) +
+    scale_x_discrete("") +
+    scale_y_continuous(valY) +
+    coord_flip() + theme_minimal()
+  
+  ggplotly(p)
+}
+
 
 # compute summary statistics at spatial unit level ----
 
