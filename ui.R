@@ -141,10 +141,10 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                 absolutePanel(id = "controls", class = "panel panel-default", fixed = TRUE,
                                               draggable = FALSE, top = 80, left = 20, right = "auto", bottom = "auto",
                                               width = 300, height = "auto",
-                                              radioButtons("wgtdom", 
-                                                           label = "CHOISIR LA MASSE",
-                                                           choices = list("Résidents" = "TOTORI",
-                                                                          "Emplois" = "TOTDES")),
+                                              radioButtons("strucalgo", 
+                                                           label = "CHOISIR LA MÉTHODE",
+                                                           choices = list("Flux dominants" = "domflo",
+                                                                          "Modularité" = "modularity")),
                                               actionButton("fludom_descr", "Description")
                                 ),
                                 absolutePanel(id = "controls", class = "panel panel-default", fixed = TRUE,
@@ -165,6 +165,26 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                                                           "Immobile" = "IM"),
                                                            selected = "TOU",
                                                            inline = FALSE)
+                                )
+                            )
+                   ),
+                   tabPanel("Synthèse",
+                            div(class="outer",
+                                tags$head(
+                                  # Include our custom CSS
+                                  includeCSS("styles.css")
+                                ),
+                                plotlyOutput("synth", width = "80%", height = "80%"),
+                                absolutePanel(id = "controls", class = "panel panel-default", fixed = TRUE,
+                                              draggable = TRUE, top = 80, left = 20, right = "auto", bottom = "auto",
+                                              width = 300, height = "auto",
+                                              radioButtons("varsplit", 
+                                                           label = "CHOISIR LA VARIABLE",
+                                                           choices = list("Tout agréger" = "tot",
+                                                                          "Catégorie socio-professionnelle" = "csp",
+                                                                          "Mode de transport" = "mod"),
+                                                           selected = "tot"),
+                                              actionButton("fludom_descr", "Description")
                                 )
                             )
                    )

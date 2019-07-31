@@ -8,7 +8,7 @@ shinyServer(function(input, output, session) {
   
   select_dataone <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop1)
-    spaceConfig <- paste(input$reloc,input$excess, sep = "_")
+    spaceConfig <- paste(input$reloc,input$excess, input$modetrans, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop1 == "TOU"){
       tempFlows <- tempFlows
@@ -50,7 +50,7 @@ shinyServer(function(input, output, session) {
   
   select_datatwo <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop2)
-    spaceConfig <- paste(input$reloc,input$excess, sep = "_")
+    spaceConfig <- paste(input$reloc,input$excess, input$modetrans, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop2 == "TOU"){
       tempFlows <- tempFlows
@@ -92,7 +92,7 @@ shinyServer(function(input, output, session) {
   
   select_datathree <- reactive({
     req(input$selindex, input$reloc, input$excess, input$modetrans, input$filterpop3)
-    spaceConfig <- paste(input$reloc,input$excess, sep = "_")
+    spaceConfig <- paste(input$reloc,input$excess, input$modetrans, sep = "_")
     tempFlows <- listTabflows[[spaceConfig]] 
     if(input$filterpop3 == "TOU"){
       tempFlows <- tempFlows
@@ -157,7 +157,7 @@ shinyServer(function(input, output, session) {
   # TAB1: update leaflet proxy ----    
   observe({
     unitVar <- dicoUnits[names(dicoUnits) == input$selindex]
-    coef <- ifelse(input$selindex %in% c("TOTORI", "TOTDES"), 0.2, 0.1)
+    coef <- ifelse(input$selindex %in% c("TOTORI", "TOTDES"), 0.16, 0.08)
     
     if(unitVar == "%"){
       labelVar <- sprintf("<strong>%s</strong><br/> %.1f %s", select_dataone()$COM$LIBGEO, select_dataone()$COM[[input$selindex]], unitVar)
@@ -296,25 +296,11 @@ shinyServer(function(input, output, session) {
                   label = lapply(X = labelVar, FUN = htmltools::HTML),         
                   stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
                   fillColor = "#FDBF6F",
-                  fillOpacity = 0.3,
+                  fillOpacity = 0.45,
                   options = pathOptions(pane = "mymap")) %>% 
       addPolylines(data = topDes$LINES, color = "#FF7F00", opacity = 0.8, weight = 1.5, stroke = TRUE)
   })
   
-  
-  # TAB3: get structure ----
-  
-  extract_structure <- reactive({
-    req(input$wgtdom)
-    topLinks <- nystuen_dacey(pol = select_datathree()$COMAGR, 
-                              tabflows = select_datathree()$TFAGR, 
-                              idpol = CODGEO, 
-                              idori = ORI, 
-                              iddes = DES, 
-                              idflow = FLOW, 
-                              wgt = input$wgtdom)
-    return(topLinks)
-  })
   
   # TAB3: initialize leaflet device ----
   
@@ -341,6 +327,7 @@ shinyServer(function(input, output, session) {
   # TAB3: update leaflet proxy ---- 
   
   observe({
+    req(input$strucalgo)
     leafBase <- leafletProxy("mapstruc") %>%
       clearShapes() %>% clearControls() %>% clearMarkers() %>%
       addPolylines(data = externalFeatures$ROAD, color = "grey", opacity = 0.6, weight = 1.3 ,
@@ -357,18 +344,41 @@ shinyServer(function(input, output, session) {
                        group = "Stations ferroviaires",
                        options = pathOptions(pane = "railstation"))
     
-    oneStruc <- extract_structure()
-    
-    leafBase %>%
-      addPolylines(data = oneStruc$FLOWS, color = "#FF7F00", opacity = 0.5, weight = 1, stroke = TRUE) %>% 
-      addCircleMarkers(data = oneStruc$NODES,
-                  label = oneStruc$NODES$LIBGEO,
-                  radius = map_values(oneStruc$NODES$TYPE, from = c(1, 2, 3), to = c(30, 10, 2)),
-                  stroke = FALSE, 
-                  color = c("#80B139", "#F26418", "#7B7971")[oneStruc$NODES$TYPE],
-                  fillOpacity = 0.6,
-                  options = pathOptions(pane = "mymap"))
 
+    if(input$strucalgo == "domflo"){
+      oneStruc <- nystuen_dacey(pol = select_datathree()$COMAGR, 
+                                tabflows = select_datathree()$TFAGR, 
+                                idpol = CODGEO, 
+                                idori = ORI, 
+                                iddes = DES, 
+                                idflow = FLOW)
+      leafBase %>%
+        addPolylines(data = oneStruc$FLOWS, color = "#FF7F00", opacity = 0.5, weight = 1, stroke = TRUE) %>% 
+        addCircleMarkers(data = oneStruc$NODES,
+                         label = oneStruc$NODES$LIBGEO,
+                         radius = map_values(oneStruc$NODES$TYPE, from = c(1, 2, 3), to = c(30, 10, 2)),
+                         stroke = FALSE, 
+                         color = c("#80B139", "#F26418", "#7B7971")[oneStruc$NODES$TYPE],
+                         fillOpacity = 0.6,
+                         options = pathOptions(pane = "mymap"))
+      
+    } else if (input$strucalgo == "modularity"){
+      oneStruc <- louvain_regions(pol = select_datathree()$COMAGR, 
+                                  tabflows = select_datathree()$TFAGR, 
+                                  idpol = CODGEO, 
+                                  idori = ORI, 
+                                  iddes = DES, 
+                                  idflow = FLOW)
+      
+      colPal <- hcl.colors(n = length(unique(oneStruc$CLUS)), palette = "Dark3")
+      leafBase %>%
+        addPolygons(data = oneStruc,
+                    stroke = TRUE, weight = 1, opacity = 0.7, color = colPal[oneStruc$CLUS], fill = TRUE,
+                    fillColor = colPal[oneStruc$CLUS],
+                    fillOpacity = 0.7,
+                    options = pathOptions(pane = "mymap"),
+                    label = paste0("Cluster : ", oneStruc$NAMECLUS))
+    }
   })
   
   

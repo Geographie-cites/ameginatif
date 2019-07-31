@@ -11,14 +11,16 @@ library(classInt)
 library(sf)
 library(leaflet)
 library(igraph)
+library(plotly)
 library(tidyverse)
 
 
-# Load data ----
+# load data ----
 
 muniBound <- readRDS("data/muniboundgeo.Rds")
 muniBoundAgr <- readRDS("data/muniboundgeoag.Rds")
-listTabflows <- readRDS(file ="data/listtabflowslabels.Rds")
+# listTabflows <- readRDS(file ="data/listtabflowslabels.Rds")
+listTabflows <- readRDS(file ="data/listwithmode.Rds")
 externalFeatures <- readRDS(file = "data/extfeatures.Rds")
 
 # prepare data ----
@@ -53,22 +55,31 @@ get_toplinks <- function(tabflows, pol, ref, varsort, oneunit, thres){
     ungroup()
   
   tabSel <- tabflows[tabflows[[refLib]] == oneunit, ]
-  tabSel$CODGEO <- tabSel[[invRef]]
-  polSel <- pol[pol$CODGEO %in% unique(c(tabSel$ORI, tabSel$DES)), ] %>% 
-    left_join(tabSel[, c("CODGEO", "FLOW", "SUMDIST")], by = "CODGEO")
   
-  tabSelSorted <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
-  nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
-  tabFinal <- tabSelSorted[1:nbRows, ] %>% 
-    left_join(polSel %>% st_set_geometry(NULL) %>% select(CODGEO, LON, LAT), by = c("ORI" = "CODGEO")) %>% 
-    left_join(polSel %>% st_set_geometry(NULL) %>% select(CODGEO, LON, LAT), by = c("DES" = "CODGEO"))
-  
-  
-  charLines <- paste0("LINESTRING(", tabFinal$LON.x, " ", tabFinal$LAT.x, ", ", tabFinal$LON.y, " ", tabFinal$LAT.y, ")")
-  spatLines <- st_sf(1:length(charLines), geometry = st_as_sfc(charLines, crs = 4326))
-  spatLines$REF <- tabFinal[, invReflib]
-  spatLines$FLOW <- tabFinal$FLOW
-  spatLines$SUMDIST <- tabFinal$SUMDIST
+  if(nrow(tabSel) == 0){
+    polSel <- pol[pol$LIBGEO == oneunit, ]
+    polSel$FLOW <- 0
+    polSel$SUMDIST <- 0
+    charLines <- paste0("LINESTRING(", 2.3363011, " ", 48.86253, ", ", 2.3363012, " ", 48.86253, ")")
+    spatLines <- st_sf(1:length(charLines), geometry = st_as_sfc(charLines, crs = 4326))
+  } else {
+    tabSel$CODGEO <- tabSel[[invRef]]
+    polSel <- pol[pol$CODGEO %in% unique(c(tabSel$ORI, tabSel$DES)), ] %>% 
+      left_join(tabSel[, c("CODGEO", "FLOW", "SUMDIST")], by = "CODGEO")
+    
+    tabSelSorted <- tabSel[order(tabSel[[varsort]], decreasing = TRUE), ]
+    nbRows <- ifelse(thres > nrow(tabSel), nrow(tabSel), thres)
+    tabFinal <- tabSelSorted[1:nbRows, ] %>% 
+      left_join(polSel %>% st_set_geometry(NULL) %>% select(CODGEO, LON, LAT), by = c("ORI" = "CODGEO")) %>% 
+      left_join(polSel %>% st_set_geometry(NULL) %>% select(CODGEO, LON, LAT), by = c("DES" = "CODGEO"))
+    
+    
+    charLines <- paste0("LINESTRING(", tabFinal$LON.x, " ", tabFinal$LAT.x, ", ", tabFinal$LON.y, " ", tabFinal$LAT.y, ")")
+    spatLines <- st_sf(1:length(charLines), geometry = st_as_sfc(charLines, crs = 4326))
+    spatLines$REF <- tabFinal[, invReflib]
+    spatLines$FLOW <- tabFinal$FLOW
+    spatLines$SUMDIST <- tabFinal$SUMDIST
+  }
   
   topDes <- list(POLYG = polSel, LINES = spatLines)
   return(topDes)
@@ -101,6 +112,9 @@ build_palette <- function(x, palseq = NULL) {
   }
   return(myPal)
 }
+
+
+
 
 # aggregate flows (arrondissements) ----
 
@@ -178,7 +192,7 @@ spatunit_indices <- function(pol, tabflows, idpol, idori, iddes, idflow, iddist)
     left_join(y = intraSum, by = "CODGEO") %>%
     left_join(y = oriSum, by = "CODGEO") %>%
     left_join(y = desSum, by = "CODGEO") %>%
-    replace_na(replace = list(TOTINTRA = 0, TOTORI = 0, TOTDES = 0, DISTORI = 0, DISTDES = 0, AVGDISTORI = 0, AVGDISTDES = 0))
+    replace_na(replace = list(TOTINTRA = 0, TOTORI = 0, TOTDES = 0, SUMDISTORI = 0, SUMDISTDES = 0, AVGDISTORI = 0, AVGDISTDES = 0))
   
   allIndices <- tabUnits %>% 
     mutate(AUTOCONT = 100 * TOTINTRA / TOTORI,
@@ -191,9 +205,55 @@ spatunit_indices <- function(pol, tabflows, idpol, idori, iddes, idflow, iddist)
 }
 
 
+# compute Louvain multilevel communities ----
+
+louvain_regions <- function(pol, tabflows, idpol, idori, iddes, idflow){
+  
+  idpol <- enquo(idpol)
+  idori <- enquo(idori)
+  iddes <- enquo(iddes)
+  idflow <- enquo(idflow)
+  
+  pol <- pol %>% mutate(CODGEO = !!idpol)
+  
+  tabFlows <- tabflows %>% 
+    mutate(ORI == !!idori, DES == !!iddes) %>% 
+    group_by(ORI, DES) %>% 
+    summarise(FLOW = sum(!!idflow, na.rm = TRUE)) %>% 
+    ungroup()
+  
+  netFlows <- graph.data.frame(tabFlows %>% select(ORI, DES, FLOW), directed = TRUE) %>% 
+    igraph::as.undirected(mode = "collapse", edge.attr.comb = "sum")
+  
+  clusLouv <- cluster_louvain(netFlows, weights = E(netFlows)$FLOW)
+  if(length(unique(clusLouv$memberships[1, ])) > 25){
+    clusMember <- clusLouv$memberships[2, ]
+  } else {
+    clusMember <- clusLouv$memberships[1, ]
+  }
+  
+  tabClus <- tibble(CODGEO = V(netFlows)$name, CLUS = clusMember)
+  polClus <- pol %>% left_join(y = tabClus, by = "CODGEO")
+  nameClus <- polClus %>% 
+    st_set_geometry(NULL) %>% 
+    mutate(WGT = TOTORI + TOTDES - TOTINTRA) %>% 
+    filter(!is.na(CLUS)) %>% 
+    group_by(CLUS) %>% 
+    arrange(desc(WGT)) %>% 
+    slice(1) %>% 
+    ungroup() %>% 
+    transmute(CLUS = CLUS, NAMECLUS = LIBGEO)
+  
+  polClusNamed <- polClus %>% left_join(nameClus, by = c("CLUS"))
+  
+  
+  return(polClusNamed)
+}
+
+
 # compute dominant flows ----
 
-nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
+nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow){
   idpol <- enquo(idpol)
   idori <- enquo(idori)
   iddes <- enquo(iddes)
@@ -201,8 +261,7 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
   
   infoCom <- pol %>% 
     st_set_geometry(NULL) %>% 
-    mutate(CODGEO = !!idpol)
-  infoCom$WGT <- infoCom[[wgt]]
+    mutate(CODGEO = !!idpol, WGT = TOTORI + TOTDES - TOTINTRA)
   
   tabFlows <- tabflows %>% 
     mutate(ORI == !!idori, DES == !!iddes) %>% 
@@ -217,7 +276,8 @@ nystuen_dacey <- function(pol, tabflows, idpol, idori, iddes, idflow, wgt){
     slice(1) %>% 
     left_join(y = infoCom[, c("CODGEO", "WGT", "LON", "LAT")], by = c("ORI" = "CODGEO")) %>%
     left_join(y = infoCom[, c("CODGEO", "WGT", "LON", "LAT")], by = c("DES" = "CODGEO")) %>% 
-    filter(WGT.x < WGT.y)
+    filter(WGT.x < WGT.y) %>% 
+    ungroup()
   
   charLines <- paste0("LINESTRING(", flowsMax$LON.x, " ", flowsMax$LAT.x, ", ", flowsMax$LON.y, " ", flowsMax$LAT.y, ")")
   spatLines <- st_sf(1:length(charLines), geometry = st_as_sfc(charLines, crs = 4326))
