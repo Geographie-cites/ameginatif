@@ -181,7 +181,14 @@ shinyServer(function(input, output, session) {
                        group = "Stations ferroviaires",
                        options = pathOptions(pane = "railstation"))
     
-    if(input$selindex %in% c("TOTORI", "TOTDES", "SUMDISTORI", "SUMDISTDES")){
+    if(nrow(select_dataone()$TF) == 0){
+      leafBase %>%
+        addPolygons(data = select_dataone()$COM,
+                    stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
+                    fillColor = "#D9D9D9",
+                    fillOpacity = 0.3,
+                    options = pathOptions(pane = "mymap"))
+    } else if(input$selindex %in% c("TOTORI", "TOTDES", "SUMDISTORI", "SUMDISTDES")){
       leafBase %>%
         addPolygons(data = select_dataone()$COM,
                     stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
@@ -344,8 +351,14 @@ shinyServer(function(input, output, session) {
                        group = "Stations ferroviaires",
                        options = pathOptions(pane = "railstation"))
     
-
-    if(input$strucalgo == "domflo"){
+    if(nrow(select_datathree()$TF) == 0){
+      leafBase %>%
+        addPolygons(data = select_dataone()$COM,
+                    stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
+                    fillColor = "#D9D9D9",
+                    fillOpacity = 0.3,
+                    options = pathOptions(pane = "mymap"))
+    } else if(input$strucalgo == "domflo"){
       oneStruc <- nystuen_dacey(pol = select_datathree()$COMAGR, 
                                 tabflows = select_datathree()$TFAGR, 
                                 idpol = CODGEO, 
@@ -370,14 +383,23 @@ shinyServer(function(input, output, session) {
                                   iddes = DES, 
                                   idflow = FLOW)
       
-      colPal <- hcl.colors(n = length(unique(oneStruc$CLUS)), palette = "Dark3")
-      leafBase %>%
-        addPolygons(data = oneStruc,
-                    stroke = TRUE, weight = 1, opacity = 0.7, color = colPal[oneStruc$CLUS], fill = TRUE,
-                    fillColor = colPal[oneStruc$CLUS],
-                    fillOpacity = 0.7,
-                    options = pathOptions(pane = "mymap"),
-                    label = paste0("Cluster : ", oneStruc$NAMECLUS))
+      if(length(unique(oneStruc$CLUS)) > 25){
+        leafBase %>%
+          addPolygons(data = select_dataone()$COM,
+                      stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
+                      fillColor = "#D9D9D9",
+                      fillOpacity = 0.3,
+                      options = pathOptions(pane = "mymap"))
+      } else {
+        colPal <- hclDark[1:length(unique(oneStruc$CLUS))]
+        leafBase %>%
+          addPolygons(data = oneStruc,
+                      stroke = TRUE, weight = 1, opacity = 0.7, color = colPal[oneStruc$CLUS], fill = TRUE,
+                      fillColor = colPal[oneStruc$CLUS],
+                      fillOpacity = 0.7,
+                      options = pathOptions(pane = "mymap"),
+                      label = paste0("Cluster : ", oneStruc$NAMECLUS))
+      }
     }
   })
   

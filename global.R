@@ -38,6 +38,9 @@ names(vecColors) <- c("TOTORI", "SUMDISTORI", "TOTDES", "SUMDISTDES")
 vecPals <- c("OrRd", "YlOrBr", "PuBu", "BuPu", "Purples")
 names(vecPals) <- c("AVGDISTORI", "AUTOCONT", "AVGDISTDES", "AUTOSUFF", "RELBAL")
 
+hclDark <- c("#E16A86", "#DC716C", "#D3794D", "#C88123", "#BA8900", "#AA9000", "#969700", "#7D9D00", "#5EA200",
+             "#29A638", "#00AA5A", "#00AC76", "#00AD8E", "#00ACA5", "#00AAB9", "#00A6CA", "#009FD8", "#3396E1", 
+             "#738CE6", "#9A81E6", "#B675E0", "#CB6CD5", "#D865C6", "#E063B4", "#E3659E")
 
 # get top links ----
 
@@ -166,7 +169,7 @@ draw_plotly <- function(data, scenar, variable, indic){
     scale_fill_manual(values = c("grey80", "firebrick")) +
     scale_x_discrete("") +
     scale_y_continuous(valY) +
-    coord_flip() + theme_minimal()
+    coord_flip() + theme_minihc
   
   ggplotly(p)
 }
@@ -392,3 +395,18 @@ map_values <- function (x, from, to, warn_missing = TRUE)
   x[!mapidxNA] <- to[mapidx[!mapidxNA]]
   x
 }
+
+
+# ggplot custom theme ----
+
+theme_minihc <- theme_minimal() +
+  theme(axis.line = element_line(color = "grey30"),
+        axis.title = element_text(family = "sans-serif", color = "grey30"),
+        axis.text = element_text(family = "sans-serif", color = "grey30"),
+        axis.ticks = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.key =  element_blank(),
+        legend.text = element_text(family = "sans-serif", color = "grey30"))
+
+
