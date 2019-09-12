@@ -421,41 +421,45 @@ shinyServer(function(input, output, session) {
   
   observeEvent(input$index_descr, {
     showModal(modalDialog(
-      includeHTML("coat/index_descr.html"),
+      includeMarkdown("coat/index_descr.md"),
       easyClose = TRUE,
+      size = "l",
+      footer = NULL
+    ))
+  })
+  
+  observeEvent(input$config_descr, {
+    showModal(modalDialog(
+      includeMarkdown("coat/config_descr.md"),
+      easyClose = TRUE,
+      size = "l",
       footer = NULL
     ))
   })
   
   observeEvent(input$flux_descr, {
     showModal(modalDialog(
-      includeHTML("coat/flux_descr.html"),
+      includeMarkdown("coat/flux_descr.md"),
       easyClose = TRUE,
-      footer = NULL
-    ))
-  })
-  
-  observeEvent(input$pool_descr, {
-    showModal(modalDialog(
-      includeHTML("coat/pool_descr.html"),
-      easyClose = TRUE,
+      size = "l",
       footer = NULL
     ))
   })
   
   observeEvent(input$fludom_descr, {
     showModal(modalDialog(
-      includeHTML("coat/fludom_descr.html"),
+      includeMarkdown("coat/fludom_descr.md"),
       easyClose = TRUE,
+      size = "l",
       footer = NULL
     ))
   })
   
   showModal(modalDialog(
-    includeHTML("coat/welcome.html"),
+    includeMarkdown("coat/welcome.md"),
     easyClose = TRUE,
+    size = "l",
     footer = NULL
   ))
-  
   
 })

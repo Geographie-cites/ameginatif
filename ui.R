@@ -12,7 +12,7 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                               draggable = TRUE, top = 80, left = 20, right = "auto", bottom = "auto",
                                               width = 300, height = "auto",
                                               radioButtons("selindex", 
-                                                           label = "INDICES",
+                                                           label = "INDICATEURS",
                                                            choices = list("Population active" = "TOTORI",
                                                                           "Emploi" = "TOTDES",
                                                                           "Solde absolu" = "ABSBAL",
@@ -84,7 +84,8 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                                                                                   "Zéro modes doux" = "ZNM",
                                                                                                   "Tout modes doux" = "TNM"),
                                                                                       selected = "ACT", 
-                                                                                      width = "100%")
+                                                                                      width = "100%"),
+                                                                         actionButton("config_descr", "Description")
                                                                          
                                                          )
                                               )
