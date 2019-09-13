@@ -1,17 +1,10 @@
-<h4><strong>Description</strong></h4>
-L'analyse des <strong> Macro Flux </strong> permet de visualiser l'ensemble des flux les plus importants. 
-Deux méthodes de représentation sont utilisées : les flux dominants, qui représentent le flux le plus important 
-de chaque ville et les hierarchise, et les structures spatiales de mobilité qui sépare les flux en quatre catégories 
-dont 3 sont représentés ici : intégrés, convergent et divergent.
-<h4><strong>Clé de lecture</strong></h4>
-<h5><strong>Flux dominants</strong></h5>
-Cette méthode proposé par Nystuen et Dacey (1961), considère qu'un lieu "I" sera dominé par un lieu "J" si deux conditions
- sont remplies : le flux le plus important depuis "I" est émis vers "J", <b>ET</b> la somme des flux reçus par "J" est
- plus grande que la somme des flux reçus par "I". Cette méthode crée ce qui est appelé en théorie des graphe, une forêt 
- (Un ensemble d'arbres (graphique acyclique)) avec trois types de noeuds : dominant, dominés et intermédiaire.
-<ul>
-<li><b>Emploi</b> permet d'observer les flux dominants basé sur les flux entrants</li>
-<li><b>Population</b> permet d'observer les flux dominants basé sur les flux sortants</li>
-<li><b>Population + Emploi</b> permet d'observer les flux dominants basé sur la somme des flux entrants et sortants</li>
-</ul>
+## Description
+
+Représenter la matrice de flux dans son ensemble donne un résultat illisible (dans le cas francilien, on observe plus de 300000 couples de lieux à représenter). L'analyse des structures permet d'extraire de la matrice de flux un squelette lisible représentant la structuration principale des mobilités.
+
+Deux méthodes de représentation sont utilisées : les **flux dominants** et la **modularité**. 
+
+La méthode des **flux dominants** consiste à sélectionner pour chaque commune uniquement le flux principal à destination d'une commune plus grande que soi. Si Poincy envoie son flux principal vers Meaux, seul ce flux est représenté à l'origine de Poincy, représentant une domination de Poincy par Meaux. Ensuite, si Meaux envoie son flux principal vers Paris, seul ce flux est représenté à l'origine de Meaux, représentant une domination de Meaux par Paris. On affiche ainsi une structure spatiale hierarchisée de la mobilité. Cette méthode crée ce qui est appelé en théorie des graphes une **forêt**, c'est-à-dire un ensemble d'arbres avec trois types de noeuds : dominant, intermédiaire, dominé.
+
+La méthode de la **modularité** produit une partition cohérente du territoire en fonction de la matrice de flux. Cela consiste à former des ensembles de communes (*clusters*) qui tissent entre elles de fortes relations et qui sont reliées au reste du territoire par de faibles relations. En d'autres termes c'est un découpage du territoire qui maximise la mobilité intragroupe et qui minimise la mobilité intergroupe
 

@@ -193,7 +193,7 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                                                                    "Distance totale" = "SUMDIST",
                                                                                    "Distance moyenne" = "AVGDIST"),
                                                                     selected = "FLOW"),
-                                                       actionButton("fludom_descr", "Description")
+                                                       actionButton("synth_descr", "Description")
                                          )),
                                   column(9,
                                 plotlyOutput("numsum", height = "70%"))

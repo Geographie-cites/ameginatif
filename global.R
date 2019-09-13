@@ -159,12 +159,17 @@ draw_plotly <- function(data, scenar, variable, indic){
   refAgr <- data[["ACT_ACT_ACT"]]
   tabAgr <- bind_rows(oneAgr, refAgr)
   tabAgr$CONFIG <- c(rep("SCENARIO", 16), rep("ACTUEL", 16))
-  tabAgr$VALEUR <- tabAgr[[indic]]
+  dg <- ifelse(indic == "AVGDIST", 1, 0)
+  tabAgr$VALEUR <- round(tabAgr[[indic]], digits = dg)
   
   valY <- ifelse(indic == "FLOW", "Flux (milliers d'individus)", 
                  ifelse(indic == "SUMDIST", "Portée totale (milliers de km)", "Portée moyenne (km/pers.)"))
   
-  p <- ggplot(tabAgr[tabAgr$VAR == variable, ]) +
+  
+  tabSel <- tabAgr[tabAgr$VAR == variable, ]
+  tabSel$MODALITE <- factor(tabSel$MODALITE, levels = tabSel$MODALITE, labels = tabSel$MODALITE)
+  
+  p <- ggplot(tabSel) +
     geom_bar(aes(x = MODALITE, y = VALEUR, fill = CONFIG), stat = "identity", position = "dodge") +
     scale_fill_manual(values = c("grey80", "firebrick")) +
     scale_x_discrete("") +
