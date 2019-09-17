@@ -455,12 +455,14 @@ shinyServer(function(input, output, session) {
     ))
   })
   
-  showModal(modalDialog(
-    includeMarkdown("coat/synth_descr.md"),
-    easyClose = TRUE,
-    size = "l",
-    footer = NULL
-  ))
+  observeEvent(input$synth_descr, {
+    showModal(modalDialog(
+      includeMarkdown("coat/synth_descr.md"),
+      easyClose = TRUE,
+      size = "l",
+      footer = NULL
+    ))
+  })
   
   showModal(modalDialog(
     includeMarkdown("coat/welcome.md"),

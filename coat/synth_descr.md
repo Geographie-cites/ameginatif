@@ -1,7 +1,7 @@
 ## Description
 
-Le graphique permet de comparer trois indicateurs - flux (nombre d'actifs), distance moyenne par individu, distance totale - selon les modalités de trois variables catégorielles. Ces variables catégorielles sont définies de la façon suivante :
+Le graphique permet de comparer trois indicateurs - **flux** (nombre d'actifs), **distance moyenne** par individu, **distance totale** - selon les modalités de trois variables catégorielles. Ces variables catégorielles sont définies de la façon suivante :
 
-- **Modes de transport** : nombre d'actifs occupés dans chaque commune
-- **Catégorie socio-professionnelle** : nombre d'emplois dans chaque commune
-- **Spatial** 
+- **Modes de transport** : le mode *voiture* désigne tous les véhicules motorisés individuels (véhicules motorisés à deux, trois et quatre roues). Le *transport collectif* inclut tous les modes collectifs et/ou publics (bus, métro, taxi). Les *modes non motorisés* ("human powered") désignent principalement la marche à pied et le vélo.
+- **Catégorie socio-professionnelle** : typologie agrégée de l'Insee des professions et catégories socio-professionnelles. Elle divise les actifs en six postes: 1/ Agriculteurs exploitants, 2/ Artisans, commerçants et chefs d’entreprise, 3/ Cadres et professions intellectuelles supérieures, 4/ Professions Intermédiaires, 5/ Employés, 6/ Ouvriers.
+- **Zone géographique** : typologie appliquée aux flux selon leur zone d'origine et de destination. Six classes sont proposées : 1/ Paris (flux ayant leur origine et leur destination dans le 75), 2/ Petite couronne (flux ayant leur origine et leur destination dans les départements 92-93-94), 3/ Grande couronne (flux ayant leur origine et leur destination dans les départements 77-78-91-95), 4 / Centripète (flux ayant leur origine en petite ou grande couronne et leur destination dans le 75), 5/ Centrifuge (flux ayant leur origine dans le 75 et leur destination en petite ou grande couronne), 6/ Intercouronne (flux ayant leur origine en petite couronne et destination en grande couronne ou l'inverse).

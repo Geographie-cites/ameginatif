@@ -199,5 +199,10 @@ shinyUI(navbarPage(title = "Améginat-IF",
                                 plotlyOutput("numsum", height = "70%"))
                             )
                    )
-                   )
+                   ),
+                   tabPanel("Guide d'utilisation", 
+                            fluidRow(
+                              column(2),
+                              column(7, includeMarkdown("coat/details.md")),
+                              column(3)))
 ))
