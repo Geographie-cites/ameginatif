@@ -37,7 +37,14 @@ Pour une estimation plus précise des portées et des distances réellement parc
 
 ### Bibliographie
 
+**Sur les navettes domicile-travail**
 
+- Commenges H., Fen-Chong J. (2017) "Navettes domicile-travail : naissance et développement d'un objet statistique structurant", *Annales de géographie*, nº715, pp.333-355.
+
+**Sur le calcul des distances**
+
+- Courel J. (2008) *170 millions de kilomètres*, Institut d'Aménagement et d'Urbanisme de la Région Île-de-France.
+- Héran F. (2009) "Des distances à vol d'oiseau aux distances réelles ou de l'origine des détours", *Flux*, nº 76-77, pp.110-121.
 
 
 
