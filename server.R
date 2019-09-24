@@ -32,20 +32,29 @@ shinyServer(function(input, output, session) {
       tempFlows <- tempFlows %>% filter(MODE == "IM")
     } else if (input$filterpop1 == "NM") {
       tempFlows <- tempFlows %>% filter(MODE == "NM")
-    }
+    } else if (input$filterpop1 == "M25") {
+      tempFlows <- tempFlows %>% filter(DIST <= 2.5)
+    } else if (input$filterpop1 == "M50") {
+      tempFlows <- tempFlows %>% filter(DIST <= 5)
+    } else if (input$filterpop1 == "M75") {
+      tempFlows <- tempFlows %>% filter(DIST <= 7.5)
+    } else if (input$filterpop1 == "M10") {
+      tempFlows <- tempFlows %>% filter(DIST <= 10)
+    } 
     
     infoCom <- spatunit_indices(pol = muniBound, tabflows = tempFlows, idpol = CODGEO, idori = ORI, iddes = DES, idflow = FLOW, iddist = DIST)
-    tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
-    polAgr <- muniBoundAgr
-    infoComAgr <- spatunit_indices(pol = polAgr, 
-                                   tabflows = tempflowsAgr, 
-                                   idpol = CODGEO, 
-                                   idori = ORI, 
-                                   iddes = DES, 
-                                   idflow = FLOW, 
-                                   iddist = DIST)
+    # tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
+    # polAgr <- muniBoundAgr
+    # infoComAgr <- spatunit_indices(pol = polAgr, 
+    #                                tabflows = tempflowsAgr, 
+    #                                idpol = CODGEO, 
+    #                                idori = ORI, 
+    #                                iddes = DES, 
+    #                                idflow = FLOW, 
+    #                                iddist = DIST)
     
-    return(list(TF = tempFlows, TFAGR = tempflowsAgr, COM = infoCom, COMAGR = infoComAgr))
+    # return(list(TF = tempFlows, TFAGR = tempflowsAgr, COM = infoCom, COMAGR = infoComAgr))
+    return(list(TF = tempFlows, TFAGR = NA, COM = infoCom, COMAGR = NA))
   })
   
   select_datatwo <- reactive({
@@ -74,20 +83,28 @@ shinyServer(function(input, output, session) {
       tempFlows <- tempFlows %>% filter(MODE == "IM")
     } else if (input$filterpop2 == "NM") {
       tempFlows <- tempFlows %>% filter(MODE == "NM")
-    }
+    } else if (input$filterpop2 == "M25") {
+      tempFlows <- tempFlows %>% filter(DIST <= 2.5)
+    } else if (input$filterpop2 == "M50") {
+      tempFlows <- tempFlows %>% filter(DIST <= 5)
+    } else if (input$filterpop2 == "M75") {
+      tempFlows <- tempFlows %>% filter(DIST <= 7.5)
+    } else if (input$filterpop2 == "M10") {
+      tempFlows <- tempFlows %>% filter(DIST <= 10)
+    } 
     
     infoCom <- spatunit_indices(pol = muniBound, tabflows = tempFlows, idpol = CODGEO, idori = ORI, iddes = DES, idflow = FLOW, iddist = DIST)
-    tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
-    polAgr <- muniBoundAgr
-    infoComAgr <- spatunit_indices(pol = polAgr, 
-                                   tabflows = tempflowsAgr, 
-                                   idpol = CODGEO, 
-                                   idori = ORI, 
-                                   iddes = DES, 
-                                   idflow = FLOW, 
-                                   iddist = DIST)
+    # tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
+    # polAgr <- muniBoundAgr
+    # infoComAgr <- spatunit_indices(pol = polAgr, 
+    #                                tabflows = tempflowsAgr, 
+    #                                idpol = CODGEO, 
+    #                                idori = ORI, 
+    #                                iddes = DES, 
+    #                                idflow = FLOW, 
+    #                                iddist = DIST)
     
-    return(list(TF = tempFlows, TFAGR = tempflowsAgr, COM = infoCom, COMAGR = infoComAgr))
+    return(list(TF = tempFlows, TFAGR = NA, COM = infoCom, COMAGR = NA))
   })
   
   select_datathree <- reactive({
@@ -116,7 +133,15 @@ shinyServer(function(input, output, session) {
       tempFlows <- tempFlows %>% filter(MODE == "IM")
     } else if (input$filterpop3 == "NM") {
       tempFlows <- tempFlows %>% filter(MODE == "NM")
-    }
+    } else if (input$filterpop3 == "M25") {
+      tempFlows <- tempFlows %>% filter(DIST <= 2.5)
+    } else if (input$filterpop3 == "M50") {
+      tempFlows <- tempFlows %>% filter(DIST <= 5)
+    } else if (input$filterpop3 == "M75") {
+      tempFlows <- tempFlows %>% filter(DIST <= 7.5)
+    } else if (input$filterpop3 == "M10") {
+      tempFlows <- tempFlows %>% filter(DIST <= 10)
+    } 
     
     infoCom <- spatunit_indices(pol = muniBound, tabflows = tempFlows, idpol = CODGEO, idori = ORI, iddes = DES, idflow = FLOW, iddist = DIST)
     tempflowsAgr <- arrflow_aggregate(before = arrDesagg, after = arrAggreg, tabflows = tempFlows, idori = "ORI", iddes = "DES")
@@ -382,8 +407,9 @@ shinyServer(function(input, output, session) {
                                   idori = ORI, 
                                   iddes = DES, 
                                   idflow = FLOW)
+      oneStruc$CLUS <- ifelse(is.na(oneStruc$CLUS), 1, oneStruc$CLUS + 1)
       
-      if(length(unique(oneStruc$CLUS)) > 25){
+      if(length(unique(oneStruc$CLUS)) > 200){
         leafBase %>%
           addPolygons(data = select_dataone()$COM,
                       stroke = TRUE, weight = 0.8, opacity = 0.4, color = "grey", fill = TRUE,
@@ -391,14 +417,18 @@ shinyServer(function(input, output, session) {
                       fillOpacity = 0.3,
                       options = pathOptions(pane = "mymap"))
       } else {
-        colPal <- hclDark[1:length(unique(oneStruc$CLUS))]
+        colPal <- c("#E8EFF2", rep(hclDark, times = 8)[1:length(unique(oneStruc$CLUS))])
+        clusBound <- oneStruc %>% group_by(CLUS) %>% summarise()
         leafBase %>%
           addPolygons(data = oneStruc,
                       stroke = TRUE, weight = 1, opacity = 0.7, color = colPal[oneStruc$CLUS], fill = TRUE,
                       fillColor = colPal[oneStruc$CLUS],
                       fillOpacity = 0.7,
                       options = pathOptions(pane = "mymap"),
-                      label = paste0("Cluster : ", oneStruc$NAMECLUS))
+                      label = paste0("Cluster : ", oneStruc$NAMECLUS)) %>%
+          addPolygons(data = clusBound,
+                      stroke = TRUE, weight = 1.6, opacity = 0.7, color = "#737373", fill = FALSE,
+                      options = pathOptions(pane = "mymap"))
       }
     }
   })
