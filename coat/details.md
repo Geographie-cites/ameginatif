@@ -1,3 +1,12 @@
+## Structure de l'application
+
+Chaque onglet propose des méthodes et des indicateurs permettant d'appréhender les mobilités franciliennes. Les onglets présentent un choix d'indicateurs dans le panneau de gauche et un choix de filtres dans le panneau de droite.
+- **Scénario :** indicateurs agrégés à la commune et surtout **Choix du scénario** (panneau central).
+- **Oursins :** visualisation des flux pour une origine ou une destination donnée.
+- **Structure :** visualisation synthétique des territoires dessinés par les flux.
+- **Synthèse :** indicateurs globaux des flux et des distances parcourues, permettant de comparer l'actuel avec le scénario choisi dans le premier onglet.
+
+
 ## Détails techniques
 
 Tous les calculs sont effectués à partir des navettes domicile-travail produites par le recensement de la population 2014, données [accessibles sur le site de l'Insee](https://www.insee.fr/fr/statistiques/2866308?sommaire=2866354). Une navette domicile-travail est définie comme le lien entre la commune de résidence d'un individu actif occupé et sa commune de travail. La seule information spatiale disponible dans le recensement est donc un couple de communes. Cette limitation implique plusieurs considérations concernant la précision et la portée de ces données.
