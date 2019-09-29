@@ -10,7 +10,9 @@ Cette application a été conçue dans le cadre du projet [Postcar Île-de-Franc
 
 ## Citation
 
-- **pour l'application :** COMMENGES Hadrien, JANIN Oscar (2019) *Améginat-IF : aménager en imaginant l'Île-de-France*, UMR 8504 Géographie-cités.
+- **pour l'application :** COMMENGES Hadrien, JANIN Oscar (2019) *Améginat-IF : aménager en imaginant l'Île-de-France*, UMR 8504 Géographie-cités. [![DOI](https://zenodo.org/badge/120883410.svg)](https://zenodo.org/badge/latestdoi/120883410)
+
+
 - **pour les données :** Insee - Recensement de la population 2014 (navettes domicile-travail) ; IGN Geofla 2016 (délimitations administratives) ; OpenStreetMap, Stamen, leaflet (fond de carte).
 
 
